@@ -185,6 +185,40 @@ test("keyboard selection plays and returns to the same card; only the settings g
   await page.screenshot({ path: "test-results/home.png" });
 });
 
+test("player: controls auto-hide after three seconds and reappear immediately on keys", async ({
+  page,
+}) => {
+  await openHome(page);
+  await page.clock.install();
+  await page
+    .getByRole("button", { name: /News story 1,/ })
+    .first()
+    .click();
+  const seek = page.getByRole("slider", { name: "Seek" });
+  const back = page.getByRole("button", { name: "Back to home" });
+  await expect(seek).toBeEnabled();
+  await expect(seek).toBeVisible();
+  await page.clock.runFor(2_999);
+  await expect(seek).toBeVisible();
+  await page.clock.runFor(1);
+  await expect(seek).toBeHidden();
+  await expect(back).toBeHidden();
+  await page.keyboard.press("ArrowRight");
+  await expect(seek).toBeVisible();
+  await expect(back).toBeVisible();
+  await expect(seek).toHaveValue("45");
+  await page.clock.runFor(2_000);
+  await page.keyboard.press("Shift");
+  await page.clock.runFor(2_999);
+  await expect(seek).toBeVisible();
+  await page.clock.runFor(1);
+  await expect(seek).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: /News story 1,/ }).first(),
+  ).toBeFocused();
+});
+
 test("player: seekbar stays above the iframe and supports pointer seeking", async ({
   page,
 }) => {

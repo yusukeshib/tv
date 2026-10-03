@@ -3,6 +3,8 @@ import * as stylex from "@stylexjs/stylex";
 import type { Video } from "../types";
 import { loadPlayerAPI, playbackError, type YouTubePlayer } from "../playerApi";
 
+export const CONTROLS_HIDE_DELAY = 3_000;
+
 function timestamp(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds || 0));
   const hours = Math.floor(total / 3600);
@@ -31,6 +33,23 @@ export function Player({
   const [error, setError] = useState<string>();
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const showControls = () => {
+    setControlsVisible(true);
+    clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(
+      () => setControlsVisible(false),
+      CONTROLS_HIDE_DELAY,
+    );
+  };
+  useEffect(() => {
+    showControls();
+    return () => clearTimeout(hideTimer.current);
+  }, []);
+  const controlsShown = controlsVisible || !ready || !!error;
 
   useEffect(() => {
     // Focus once, not whenever background list/config updates rerender the parent.
@@ -163,6 +182,7 @@ export function Player({
     else player.current.playVideo();
   };
   const handleKey = useEffectEvent((event: KeyboardEvent) => {
+    showControls();
     if (event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key === "Escape") {
       event.preventDefault();
@@ -188,8 +208,14 @@ export function Player({
       role="dialog"
       aria-modal="true"
       aria-label={video.title}
+      onFocusCapture={(event) => {
+        if (event.target !== event.currentTarget) showControls();
+      }}
     >
-      <header {...stylex.props(styles.header)}>
+      <header
+        {...stylex.props(styles.header, !controlsShown && styles.hidden)}
+        data-controls-visible={controlsShown}
+      >
         <button {...stylex.props(styles.button)} onClick={onClose}>
           ← Back to home
         </button>
@@ -207,7 +233,8 @@ export function Player({
         </div>
       )}
       <footer
-        {...stylex.props(styles.transport)}
+        {...stylex.props(styles.transport, !controlsShown && styles.hidden)}
+        data-controls-visible={controlsShown}
         aria-label="Playback controls"
       >
         <div {...stylex.props(styles.timeline)}>
@@ -251,6 +278,8 @@ const styles = stylex.create({
     insetInline: 0,
     top: 0,
     zIndex: 1,
+    transitionProperty: "opacity, visibility",
+    transitionDuration: "180ms",
     display: "flex",
     alignItems: "center",
     padding: "clamp(16px, 2vw, 36px)",
@@ -276,6 +305,7 @@ const styles = stylex.create({
     },
     outlineOffset: 4,
   },
+  hidden: { opacity: 0, visibility: "hidden" },
   frameWrap: {
     position: "absolute",
     inset: 0,
@@ -288,6 +318,8 @@ const styles = stylex.create({
     insetInline: 0,
     bottom: 0,
     zIndex: 1,
+    transitionProperty: "opacity, visibility",
+    transitionDuration: "180ms",
     display: "flex",
     flexDirection: "column",
     gap: 12,
