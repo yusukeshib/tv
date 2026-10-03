@@ -44,7 +44,7 @@
   [data-player-seek]::-webkit-slider-runnable-track {
     height: 6px;
     border-radius: 999px;
-    background: #8e8b93;
+    background: transparent;
   }
   [data-player-seek]::-webkit-slider-thumb {
     -webkit-appearance: none;
@@ -58,12 +58,7 @@
   [data-player-seek]::-moz-range-track {
     height: 6px;
     border-radius: 999px;
-    background: #8e8b93;
-  }
-  [data-player-seek]::-moz-range-progress {
-    height: 6px;
-    border-radius: 999px;
-    background: #fff;
+    background: transparent;
   }
   [data-player-seek]::-moz-range-thumb {
     width: 20px;

@@ -243,6 +243,9 @@ export function Player({
             {...stylex.props(styles.seek)}
             type="range"
             data-player-seek
+            style={{
+              backgroundImage: `linear-gradient(to right, #fff ${duration ? (Math.min(position, duration) / duration) * 100 : 0}%, rgba(255,255,255,0.3) 0)`,
+            }}
             aria-label="Seek"
             min={0}
             max={duration || 1}
@@ -340,12 +343,12 @@ const styles = stylex.create({
     pointerEvents: "auto",
     flexGrow: 1,
     minWidth: 40,
-    height: 26,
+    height: 6,
     margin: 0,
     appearance: "none",
     backgroundColor: "transparent",
     border: 0,
-    borderRadius: 4,
+    borderRadius: 999,
     outline: { default: "none", ":focus-visible": "2px solid #fff" },
     outlineOffset: 4,
     cursor: "pointer",

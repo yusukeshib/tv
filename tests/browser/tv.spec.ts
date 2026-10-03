@@ -245,6 +245,12 @@ test("player: seekbar stays above the iframe and supports pointer seeking", asyn
     }),
   ).toBe(true);
   await expect(seek).toHaveCSS("appearance", "none");
+  // Played portion (40s of 240s) is drawn as a white bar over a translucent track.
+  await expect(seek).toHaveCSS(
+    "background-image",
+    /rgb\(255, 255, 255\) 16\.66/,
+  );
+  await seek.screenshot({ path: "test-results/seekbar.png" });
   await expect(page.getByLabel("Playback controls").locator("div")).toHaveCSS(
     "background-color",
     "rgba(12, 12, 16, 0.9)",
