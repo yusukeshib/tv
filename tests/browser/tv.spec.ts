@@ -9,6 +9,7 @@ const config = {
 };
 const videos = Array.from({ length: 12 }, (_, i) => ({
   id: { videoId: `video${String(i).padStart(6, "0")}` },
+  statistics: { viewCount: "1234567" },
   snippet: {
     title: `News story ${i + 1}`,
     channelTitle: "News channel",
@@ -97,6 +98,9 @@ test("keyboard selection plays and returns to the same card; no management contr
 }) => {
   await openHome(page);
   await expect(page.getByRole("search")).toHaveCount(0);
+  await expect(
+    page.getByText("1.2M views", { exact: true }).first(),
+  ).toBeVisible();
   await page.getByRole("button", { name: /News story 1,/ }).focus();
   await page.keyboard.press("ArrowRight");
   const second = page.getByRole("button", { name: /News story 2,/ });
@@ -108,6 +112,9 @@ test("keyboard selection plays and returns to the same card; no management contr
   );
   const seek = page.getByRole("slider", { name: "Seek" });
   await expect(seek).toBeEnabled();
+  await expect(
+    page.getByRole("group", { name: "Video information" }),
+  ).toHaveCount(0);
   await expect(
     page.getByRole("button", {
       name: /fullscreen|mute|rewind|forward|pause|^play$/i,

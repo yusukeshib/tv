@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import type { Video } from "../types";
 import { theme } from "../theme.stylex";
+import { formatViews } from "../formatViews";
 
 interface Props {
   video: Video;
@@ -37,8 +38,11 @@ export function VideoCard({
       </div>
       <div {...stylex.props(styles.content)}>
         <div {...stylex.props(styles.title)}>{video.title}</div>
-        <div {...stylex.props(styles.meta)}>
-          <span {...stylex.props(styles.channel)}>{video.channelTitle}</span>
+        <div {...stylex.props(styles.meta, styles.channel)}>
+          {video.channelTitle}
+        </div>
+        <div {...stylex.props(styles.meta, styles.details)}>
+          <span>{formatViews(video.viewCount)}</span>
           {!Number.isNaN(date.getTime()) && (
             <time dateTime={video.publishedAt}>
               {date.toLocaleDateString("en-US")}
@@ -108,7 +112,9 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     lineHeight: theme.bodyMediumLine,
   },
+  details: { justifyContent: "space-between" },
   channel: {
+    display: "block",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",

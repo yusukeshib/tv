@@ -178,7 +178,6 @@ export function Player({
         <button {...stylex.props(styles.button)} onClick={onClose}>
           ← Back to home
         </button>
-        <p {...stylex.props(styles.title)}>{video.title}</p>
       </header>
       <div ref={host} {...stylex.props(styles.frameWrap)} />
       {error && (
@@ -235,7 +234,7 @@ const styles = stylex.create({
     overflowY: "auto",
     fontFamily: "system-ui, sans-serif",
   },
-  header: { display: "flex", alignItems: "center", gap: 28, flexShrink: 0 },
+  header: { display: "flex", alignItems: "center", gap: 24, flexShrink: 0 },
   button: {
     color: "#fff",
     backgroundColor: "#272730",
@@ -252,14 +251,6 @@ const styles = stylex.create({
       ":focus-visible": "2px solid #fff",
     },
     outlineOffset: 4,
-  },
-  title: {
-    fontSize: "clamp(17px, 1.3vw, 24px)",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    margin: 0,
-    color: "#bfbfc9",
   },
   frameWrap: {
     position: "relative",

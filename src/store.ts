@@ -112,7 +112,11 @@ export const isVideo = (v: unknown): v is Video =>
   typeof v.thumbnail === "string" &&
   /^https:\/\/(i\.ytimg\.com|img\.youtube\.com)\//.test(v.thumbnail) &&
   typeof v.publishedAt === "string" &&
-  Number.isFinite(Date.parse(v.publishedAt));
+  Number.isFinite(Date.parse(v.publishedAt)) &&
+  (v.viewCount == null ||
+    (typeof v.viewCount === "number" &&
+      Number.isSafeInteger(v.viewCount) &&
+      v.viewCount >= 0));
 
 function readRow(
   value: unknown,

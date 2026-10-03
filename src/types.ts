@@ -22,6 +22,8 @@ export interface Video {
   channelTitle: string;
   thumbnail: string;
   publishedAt: string;
+  // undefined: old cache; null: YouTube did not provide a count.
+  viewCount?: number | null;
 }
 
 export interface VideoPage {

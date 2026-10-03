@@ -20,6 +20,7 @@ export const video = (
   id,
   title: id,
   channelTitle: "Channel",
+  viewCount: 12345,
   thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
   publishedAt,
 });

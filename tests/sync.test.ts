@@ -81,7 +81,7 @@ describe("background synchronization", () => {
     ).toHaveLength(2);
     expect(apiCalls(request)).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(VIDEO_INTERVAL - CONFIG_INTERVAL);
-    expect(apiCalls(request)).toHaveLength(1);
+    expect(apiCalls(request)).toHaveLength(2); // search + one batched statistics request
   });
 
   it("retains cached setup and videos when the config request fails", async () => {
@@ -149,7 +149,7 @@ describe("background synchronization", () => {
     ]);
     expect(store.getSnapshot().rows.news.updatedAt).toBe(original.updatedAt);
     await controller.loadMore("news");
-    expect(request).toHaveBeenCalledOnce();
+    expect(request).toHaveBeenCalledTimes(2);
   });
 
   it("ignores late pagination results after the row's search settings change", async () => {

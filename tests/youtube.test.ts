@@ -5,16 +5,26 @@ import { item, json, row, video } from "./fixtures";
 const signal = () => new AbortController().signal;
 describe("YouTube requests", () => {
   it("requests embeddable candidates with configured ranking and forwards pagination", async () => {
-    const request = vi.fn<typeof fetch>().mockResolvedValue(
-      json({
-        items: [
-          item("bbbbbbbbbbb"),
-          item("aaaaaaaaaaa", "2026-02-01T00:00:00Z"),
-          item("invalid"),
-        ],
-        nextPageToken: "next",
-      }),
-    );
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        json({
+          items: [
+            item("bbbbbbbbbbb"),
+            item("aaaaaaaaaaa", "2026-02-01T00:00:00Z"),
+            item("invalid"),
+          ],
+          nextPageToken: "next",
+        }),
+      )
+      .mockResolvedValueOnce(
+        json({
+          items: [
+            { id: "bbbbbbbbbbb", statistics: { viewCount: "0" } },
+            { id: "aaaaaaaaaaa", statistics: { viewCount: "1234567" } },
+          ],
+        }),
+      );
     const result = await new YouTubeClient(() => "secret", request).page(
       row,
       signal(),
@@ -36,6 +46,12 @@ describe("YouTube requests", () => {
       "bbbbbbbbbbb",
     ]);
     expect(result.nextPageToken).toBe("next");
+    expect(result.videos.map((video) => video.viewCount)).toEqual([1234567, 0]);
+    const statisticsURL = new URL(String(request.mock.calls[1][0]));
+    expect(statisticsURL.searchParams.get("part")).toBe("statistics");
+    expect(statisticsURL.searchParams.get("id")).toBe(
+      "bbbbbbbbbbb,aaaaaaaaaaa",
+    );
   });
 
   it("forwards options and freezes relative cutoffs across pagination", async () => {

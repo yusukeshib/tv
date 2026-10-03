@@ -150,6 +150,7 @@ export class SyncController {
         if (
           !cached ||
           cached.definitionKey !== definitionKey(row) ||
+          cached.videos.some((video) => video.viewCount === undefined) ||
           Date.now() - cached.updatedAt >= VIDEO_INTERVAL
         )
           await this.refreshRow(row);

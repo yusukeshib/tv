@@ -24,6 +24,7 @@ interface Item {
     videoPublishedAt?: string;
   };
   status?: { embeddable?: boolean; privacyStatus?: string };
+  statistics?: { viewCount?: string };
 }
 interface Response {
   items?: Item[];
@@ -43,6 +44,12 @@ export function newest(videos: Video[]): Video[] {
       a.id.localeCompare(b.id),
   );
 }
+function viewCount(item: Item): number | null {
+  const value = item.statistics?.viewCount;
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
+  const count = Number(value);
+  return Number.isSafeInteger(count) ? count : null;
+}
 function toVideo(item: Item): Video | undefined {
   const id = typeof item.id === "object" ? item.id.videoId : item.id;
   const snippet = item.snippet;
@@ -59,6 +66,7 @@ function toVideo(item: Item): Video | undefined {
     channelTitle: snippet.channelTitle || "",
     publishedAt: snippet.publishedAt,
     thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+    viewCount: viewCount(item),
   };
 }
 
@@ -180,12 +188,27 @@ export class YouTubeClient {
         },
         signal,
       );
+      const videos = (result.items || [])
+        .map(toVideo)
+        .filter((video): video is Video => !!video);
+      if (videos.length) {
+        // One statistics request for the page, never one request per card.
+        const statistics = await this.get(
+          "videos",
+          { part: "statistics", id: videos.map((video) => video.id).join(",") },
+          signal,
+        );
+        const counts = new Map(
+          (statistics.items || []).map((item) => [
+            typeof item.id === "object" ? item.id.videoId : item.id,
+            viewCount(item),
+          ]),
+        );
+        for (const video of videos)
+          video.viewCount = counts.get(video.id) ?? null;
+      }
       return {
-        videos: newest(
-          (result.items || [])
-            .map(toVideo)
-            .filter((video): video is Video => !!video),
-        ),
+        videos: newest(videos),
         nextPageToken: result.nextPageToken,
         ...(cutoff ? { publishedAfter: cutoff } : {}),
       };
@@ -216,7 +239,7 @@ export class YouTubeClient {
     if (!ids.length) return { videos: [], nextPageToken: result.nextPageToken };
     const details = await this.get(
       "videos",
-      { part: "snippet,status", id: ids.join(",") },
+      { part: "snippet,status,statistics", id: ids.join(",") },
       signal,
     );
     const videos = (details.items || [])
