@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { API_KEY, createStore, SNAPSHOT_KEY } from "../src/store";
+import { createStore, SNAPSHOT_KEY } from "../src/store";
 import {
   CONFIG_INTERVAL,
   CONFIG_URL,
@@ -50,7 +50,6 @@ function setup(
 ) {
   const storage = memoryStorage({
     [SNAPSHOT_KEY]: JSON.stringify(saved),
-    [API_KEY]: "key",
   });
   const store = createStore(storage);
   const request = vi.fn<typeof fetch>().mockImplementation(async (input) => {
@@ -137,7 +136,15 @@ describe("background synchronization", () => {
   it("merges pagination without duplicates and preserves the original refresh age", async () => {
     const original = cached(Date.now() - 1_000, { nextPageToken: "page2" });
     const { controller, store, request } = setup(snapshot(original), () =>
-      json({ items: [item(), item("bbbbbbbbbbb", "2026-02-01T00:00:00Z")] }),
+      json({
+        items: [item(), item("bbbbbbbbbbb", "2026-02-01T00:00:00Z")].map(
+          (video) => ({
+            ...video,
+            contentDetails: { duration: "PT10M" },
+            statistics: { viewCount: "1000" },
+          }),
+        ),
+      }),
     );
     await controller.loadMore("news");
     expect(
@@ -187,5 +194,93 @@ describe("background synchronization", () => {
     await pending;
     expect(store.getSnapshot()).toEqual(saved);
     expect(controller.getStatus().loadingRows).toEqual([]);
+  });
+
+  it("never replaces locally saved defaults or an empty list on later ticks and reloads", async () => {
+    const { store, storage, request, controller } = setup();
+    store.saveSettings({ ...store.getSettings(), rows: [] });
+    controller.settingsChanged(false);
+    await vi.advanceTimersByTimeAsync(CONFIG_INTERVAL * 2);
+    expect(request).not.toHaveBeenCalled();
+    expect(store.getSnapshot().config.rows).toEqual([]);
+    expect(createStore(storage).getSnapshot().localConfig).toBe(true);
+  });
+
+  it("does not apply a GitHub defaults response racing a local save", async () => {
+    const response = deferred<Response>();
+    const { controller, store } = setup(snapshot(), () => response.promise);
+    const pending = controller.tick();
+    store.saveSettings({
+      ...store.getSettings(),
+      rows: [],
+      apiKey: "local-key",
+    });
+    response.resolve(json({ version: 1, rows: [row] }));
+    await pending;
+    expect(store.getSnapshot().config.rows).toEqual([]);
+    expect(store.getKey()).toBe("local-key");
+    expect(controller.getStatus().notice).toBeUndefined();
+  });
+
+  it("keeps authentication errors visible after list edits until the key changes", async () => {
+    const saved = snapshot(cached(Date.now() - VIDEO_INTERVAL));
+    const { controller, store, request } = setup(saved, (url) =>
+      url.toString() === CONFIG_URL
+        ? json(saved.config)
+        : json({ error: { errors: [{ reason: "keyInvalid" }] } }, 403),
+    );
+    await controller.tick();
+    const notice = controller.getStatus().notice;
+    expect(notice).toContain("API key");
+    const calls = apiCalls(request).length;
+    store.saveSettings({ ...store.getSettings(), rows: [] });
+    controller.settingsChanged(false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(controller.getStatus().notice).toBe(notice);
+    expect(apiCalls(request)).toHaveLength(calls);
+    store.saveSettings({
+      ...store.getSettings(),
+      apiKey: "new-key",
+      rows: [row],
+    });
+    controller.settingsChanged(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(apiCalls(request)).toHaveLength(calls + 1);
+  });
+
+  it("aborts deleted rows and ignores late pagination after local edits", async () => {
+    const response = deferred<Response>();
+    const { controller, store } = setup(
+      snapshot(cached(Date.now(), { nextPageToken: "next" })),
+      () => response.promise,
+    );
+    const pending = controller.loadMore("news");
+    store.saveSettings({ ...store.getSettings(), rows: [] });
+    controller.settingsChanged(false);
+    response.resolve(json({ items: [item()] }));
+    await pending;
+    expect(store.getSnapshot().rows).toEqual({});
+    expect(controller.getStatus().loadingRows).toEqual([]);
+  });
+
+  it("refreshes a newly saved row immediately after an in-flight defaults tick finishes", async () => {
+    const response = deferred<Response>();
+    const { controller, store, request } = setup(snapshot(), (url) =>
+      url.toString() === CONFIG_URL ? response.promise : json({ items: [] }),
+    );
+    const pending = controller.tick();
+    store.saveSettings({
+      ...store.getSettings(),
+      rows: [{ ...row, search: { ...row.search, query: "local query" } }],
+    });
+    controller.settingsChanged(false);
+    response.resolve(json({ version: 1, rows: [row] }));
+    await pending;
+    await vi.advanceTimersByTimeAsync(0);
+    expect(apiCalls(request)).toHaveLength(1);
+    expect(new URL(String(apiCalls(request)[0][0])).searchParams.get("q")).toBe(
+      "local query",
+    );
+    expect(store.getSnapshot().rows.news).toBeDefined();
   });
 });

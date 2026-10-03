@@ -40,6 +40,7 @@ export class SyncController {
   private interval?: ReturnType<typeof setInterval>;
   private stopped = true;
   private ticking = false;
+  private retick = false;
   private authBlocked = false;
   private backoff: Partial<Record<RowDefinition["type"], number>> = {};
 
@@ -90,6 +91,7 @@ export class SyncController {
     this.interval = setInterval(() => {
       if (!document.hidden) void this.tick();
     }, CONFIG_INTERVAL);
+    this.retick = true;
     if (!document.hidden) void this.tick();
   }
   stop() {
@@ -135,9 +137,22 @@ export class SyncController {
     this.publish();
   }
 
+  settingsChanged(keyChanged: boolean) {
+    if (keyChanged) this.resetKey();
+    else this.abort();
+    // Aborted generations cannot save results or clear newer requests.
+    this.requests.clear();
+    // Editing a list cannot unblock a rejected key; keep its error visible.
+    if (!this.authBlocked) this.errors.clear();
+    this.publish();
+    this.retick = true;
+    void this.tick();
+  }
+
   async tick() {
     if (this.stopped || this.ticking || document.hidden) return;
     this.ticking = true;
+    this.retick = false;
     try {
       this.store.prune();
       await this.refreshConfig();
@@ -159,9 +174,11 @@ export class SyncController {
       this.report("storage", error);
     } finally {
       this.ticking = false;
+      if (this.retick) void this.tick();
     }
   }
   private async refreshConfig() {
+    if (this.store.getSnapshot().localConfig) return;
     const controller = new AbortController();
     this.configRequest = controller;
     try {
@@ -179,6 +196,7 @@ export class SyncController {
       const config = parseConfig(await response.json());
       if (controller.signal.aborted || this.stopped) return;
       const previous = this.store.getSnapshot();
+      if (previous.localConfig) return;
       if (JSON.stringify(config) !== JSON.stringify(previous.config)) {
         const rows: Snapshot["rows"] = {};
         for (const row of config.rows) {
@@ -201,7 +219,7 @@ export class SyncController {
       }
       this.errors.delete("config");
     } catch (error) {
-      if (!controller.signal.aborted)
+      if (!controller.signal.aborted && !this.store.getSnapshot().localConfig)
         this.report(
           "config",
           error instanceof TypeError

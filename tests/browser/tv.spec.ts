@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import { playerAPIMock } from "./playerMock";
 
 const config = {
@@ -17,7 +18,7 @@ const videos = Array.from({ length: 12 }, (_, i) => ({
     publishedAt: new Date(Date.now() - i * 3_600_000).toISOString(),
   },
 }));
-async function mockNetwork(page: Page, homeConfig = config) {
+async function mockNetwork(page: Page, homeConfig: unknown = config) {
   await page.route("https://www.youtube.com/iframe_api", (route) =>
     route.fulfill({
       contentType: "application/javascript",
@@ -30,12 +31,27 @@ async function mockNetwork(page: Page, homeConfig = config) {
       json: homeConfig,
     }),
   );
-  await page.route("https://www.googleapis.com/**", (route) =>
-    route.fulfill({
+  await page.route("https://www.googleapis.com/**", (route) => {
+    const endpoint = new URL(route.request().url()).pathname.split("/").pop();
+    const items =
+      endpoint === "channels"
+        ? [{ contentDetails: { relatedPlaylists: { uploads: "uploads" } } }]
+        : endpoint === "playlistItems"
+          ? videos.map((video) => ({
+              contentDetails: { videoId: video.id.videoId },
+            }))
+          : endpoint === "videos"
+            ? videos.map((video) => ({
+                ...video,
+                id: video.id.videoId,
+                status: { embeddable: true, privacyStatus: "public" },
+              }))
+            : videos;
+    return route.fulfill({
       headers: { "Access-Control-Allow-Origin": "*" },
-      json: { items: videos },
-    }),
-  );
+      json: { items },
+    });
+  });
   await page.route("https://i.ytimg.com/**", (route) =>
     route.fulfill({
       headers: { "Access-Control-Allow-Origin": "*" },
@@ -50,11 +66,19 @@ async function mockNetwork(page: Page, homeConfig = config) {
     }),
   );
 }
-async function openHome(page: Page, homeConfig = config) {
+async function openHome(page: Page, homeConfig: unknown = config) {
   await mockNetwork(page, homeConfig);
   await page.addInitScript(() => {
-    if (!localStorage.getItem("tv.youtube-key"))
-      localStorage.setItem("tv.youtube-key", "test-browser-key");
+    if (!localStorage.getItem("tv.snapshot.v1"))
+      localStorage.setItem(
+        "tv.snapshot.v1",
+        JSON.stringify({
+          version: 1,
+          apiKey: "test-browser-key",
+          config: { version: 1, rows: [] },
+          rows: {},
+        }),
+      );
   });
   await page.goto("./");
   await expect(
@@ -86,7 +110,9 @@ test("first-run key stays on the device and setup is skipped on reload", async (
   await page.getByRole("button", { name: /Save and start/ }).click();
   await expect(page.getByRole("heading", { name: "Japan news" })).toBeVisible();
   expect(
-    await page.evaluate(() => localStorage.getItem("tv.youtube-key")),
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem("tv.snapshot.v1")!).apiKey,
+    ),
   ).toBe("test-browser-key");
   expect(page.url()).not.toContain("test-browser-key");
   await page.reload();
@@ -94,7 +120,7 @@ test("first-run key stays on the device and setup is skipped on reload", async (
   await expect(page.getByLabel("API key", { exact: true })).toHaveCount(0);
 });
 
-test("keyboard selection plays and returns to the same card; no management controls", async ({
+test("keyboard selection plays and returns to the same card; only the settings gear is visible", async ({
   page,
 }) => {
   await openHome(page);
@@ -151,8 +177,11 @@ test("keyboard selection plays and returns to the same card; no management contr
   await expect(page).toHaveURL(/#\/$/);
   await expect(second).toBeFocused();
   await expect(
-    page.getByRole("button", { name: /settings|view all|sort/i }),
+    page.getByRole("button", { name: /view all|sort/i }),
   ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Settings", exact: true }),
+  ).toHaveCount(1);
   await page.screenshot({ path: "test-results/home.png" });
 });
 
@@ -241,7 +270,9 @@ test("HTML-only update is installed then reloaded without losing data or selecti
     page.getByRole("button", { name: /News story 4,/ }),
   ).toBeFocused();
   expect(
-    await page.evaluate(() => localStorage.getItem("tv.youtube-key")),
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem("tv.snapshot.v1")!).apiKey,
+    ),
   ).toBe("test-browser-key");
 });
 
@@ -577,4 +608,329 @@ test("compact rows keep five cards visible and the selected ring inside the gutt
   }
   await page.setViewportSize({ width: 1786, height: 1080 });
   await page.screenshot({ path: "test-results/compact-home.png" });
+});
+
+async function openSettings(page: Page) {
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Settings", exact: true }),
+  ).toBeVisible();
+}
+
+async function savedSettings(page: Page) {
+  return page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem("tv.snapshot.v1")!);
+    return {
+      apiKey: saved.apiKey,
+      config: saved.config,
+      localConfig: saved.localConfig,
+    };
+  });
+}
+
+async function loadSettingsJSON(page: Page, data: unknown) {
+  await page.getByLabel("Load settings JSON").setInputFiles({
+    name: "settings.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(data)),
+  });
+}
+
+test("settings: Home has only a gear; Cancel discards edits and restores gear focus", async ({
+  page,
+}) => {
+  await openHome(page);
+  await expect(
+    page.getByRole("button", { name: "Settings", exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("button", { name: /Add search|Load JSON|Dump JSON|Delete/ }),
+  ).toHaveCount(0);
+  const before = await savedSettings(page);
+  await openSettings(page);
+  await expect(page.getByLabel("API key", { exact: true })).toBeFocused();
+  await page.getByLabel("Label", { exact: true }).fill("Unsaved label");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Japan news" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Settings", exact: true }),
+  ).toBeFocused();
+  expect(await savedSettings(page)).toEqual(before);
+});
+
+test("settings: all search defaults seed a new saved row and persist with the key", async ({
+  page,
+}) => {
+  await openHome(page);
+  const searches: URL[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (
+      url.hostname === "www.googleapis.com" &&
+      url.pathname.endsWith("/search")
+    )
+      searches.push(url);
+  });
+  await openSettings(page);
+  const defaults = page.getByRole("group", {
+    name: "Search defaults",
+    exact: true,
+  });
+  await defaults.getByLabel("Candidate order").selectOption("viewCount");
+  await defaults.getByLabel("Time range").selectOption("7d");
+  await defaults.getByLabel("Language preference").fill("ja");
+  await defaults.getByLabel("Region", { exact: true }).fill("JP");
+  await defaults.getByLabel("Results per page").fill("50");
+  await defaults.getByLabel("Minimum duration (seconds)").fill("0");
+  await page
+    .getByLabel("API key", { exact: true })
+    .fill("replacement-browser-key");
+  await page.getByRole("button", { name: "Add search", exact: true }).click();
+  const added = page.getByRole("group", { name: "2. New search", exact: true });
+  await expect(added.getByLabel("Candidate order")).toHaveValue("viewCount");
+  await expect(added.getByLabel("Time range")).toHaveValue("7d");
+  await expect(added.getByLabel("Language preference")).toHaveValue("ja");
+  await expect(added.getByLabel("Region", { exact: true })).toHaveValue("JP");
+  await expect(added.getByLabel("Results per page")).toHaveValue("50");
+  await expect(added.getByLabel("Minimum duration (seconds)")).toHaveValue("0");
+  await added.getByLabel("Search query").fill("space news");
+  await added.getByLabel("Label", { exact: true }).fill("Space");
+  expect(searches).toHaveLength(0);
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Space", exact: true }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      searches
+        .find((url) => url.searchParams.get("q") === "space news")
+        ?.searchParams.get("order"),
+    )
+    .toBe("viewCount");
+  const params = searches.find(
+    (url) => url.searchParams.get("q") === "space news",
+  )!.searchParams;
+  expect(params.get("relevanceLanguage")).toBe("ja");
+  expect(params.get("regionCode")).toBe("JP");
+  expect(params.get("maxResults")).toBe("50");
+  expect(params.get("publishedAfter")).toBeTruthy();
+  expect(params.get("key")).toBe("replacement-browser-key");
+  const before = await savedSettings(page);
+  expect(before.config.rows[1].search).toMatchObject({
+    query: "space news",
+    minDurationSeconds: 0,
+  });
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Space", exact: true }),
+  ).toBeVisible();
+  expect(await savedSettings(page)).toEqual(before);
+  await openSettings(page);
+  await expect(
+    page
+      .getByRole("group", { name: "Search defaults", exact: true })
+      .getByLabel("Candidate order"),
+  ).toHaveValue("viewCount");
+});
+
+test("settings: default search and channel rows can all be deleted without returning", async ({
+  page,
+}) => {
+  await openHome(page, {
+    version: 1,
+    rows: [
+      ...config.rows,
+      {
+        id: "bbc",
+        label: "BBC News",
+        type: "channel",
+        channelId: "UC16niRr50-MSBwiO3YDb3RA",
+      },
+    ],
+  });
+  await expect(
+    page.getByRole("heading", { name: "BBC News", exact: true }),
+  ).toBeVisible();
+  await openSettings(page);
+  await page
+    .getByRole("button", { name: "Delete Japan news", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Delete BBC News", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(
+    page.getByText("Open Settings to add a search or channel."),
+  ).toBeVisible();
+  let remoteReads = 0;
+  page.on("request", (request) => {
+    if (request.url().startsWith("https://raw.githubusercontent.com/"))
+      remoteReads++;
+  });
+  await page.reload();
+  await expect(
+    page.getByText("Open Settings to add a search or channel."),
+  ).toBeVisible();
+  expect(remoteReads).toBe(0);
+  expect((await savedSettings(page)).config.rows).toEqual([]);
+  await openSettings(page);
+  await expect(page.getByText("Your Home list is empty.")).toBeVisible();
+});
+
+test("settings: Dump and Load round-trip all settings including the secret key on a fresh device", async ({
+  page,
+}) => {
+  await openHome(page);
+  await openSettings(page);
+  const downloadEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Dump JSON", exact: true }).click();
+  const download = await downloadEvent;
+  const dumped = JSON.parse(await readFile((await download.path())!, "utf8"));
+  expect(Object.keys(dumped).sort()).toEqual([
+    "apiKey",
+    "rows",
+    "searchDefaults",
+    "version",
+  ]);
+  expect(dumped.apiKey).toBe("test-browser-key");
+  expect(dumped.rows[0].search.query).toBe("Japan news");
+  expect(dumped.searchDefaults).toEqual({
+    order: "relevance",
+    timeRange: "all",
+    maxResults: 25,
+    minDurationSeconds: 240,
+  });
+  const freshContext = await page.context().browser()!.newContext();
+  try {
+    const fresh = await freshContext.newPage();
+    await mockNetwork(fresh);
+    await fresh.goto(page.url().split("#")[0]);
+    await expect(
+      fresh.getByRole("button", { name: "Open settings / Load JSON" }),
+    ).toBeVisible();
+    await fresh
+      .getByRole("button", { name: "Open settings / Load JSON" })
+      .click();
+    await loadSettingsJSON(fresh, dumped);
+    await expect(fresh.getByRole("status")).toContainText(
+      "Loaded settings into the editor",
+    );
+    await expect(fresh.getByLabel("API key", { exact: true })).toHaveValue(
+      "test-browser-key",
+    );
+    await fresh
+      .getByRole("button", { name: "Save settings", exact: true })
+      .click();
+    await expect(
+      fresh.getByRole("heading", { name: "Japan news" }),
+    ).toBeVisible();
+    const saved = await savedSettings(fresh);
+    expect({ ...saved.config, apiKey: saved.apiKey }).toEqual(dumped);
+  } finally {
+    await freshContext.close();
+  }
+});
+
+test("settings: invalid Load preserves the draft; valid Load can be cancelled without replacing saved settings", async ({
+  page,
+}) => {
+  await openHome(page);
+  const before = await savedSettings(page);
+  await openSettings(page);
+  await page.getByLabel("Label", { exact: true }).fill("Unsaved label");
+  const imported = {
+    ...before.config,
+    apiKey: "imported-key",
+    searchDefaults: {
+      order: "date",
+      timeRange: "all",
+      maxResults: 10,
+      minDurationSeconds: 0,
+    },
+    rows: [],
+  };
+  await loadSettingsJSON(page, {
+    ...imported,
+    rows: [before.config.rows[0], before.config.rows[0]],
+  });
+  await expect(page.getByRole("alert")).toContainText("unique ID");
+  await expect(page.getByLabel("Label", { exact: true })).toHaveValue(
+    "Unsaved label",
+  );
+  expect(await savedSettings(page)).toEqual(before);
+  await loadSettingsJSON(page, imported);
+  await expect(page.getByRole("status")).toContainText("Loaded settings");
+  await expect(page.getByLabel("API key", { exact: true })).toHaveValue(
+    "imported-key",
+  );
+  await expect(page.getByText("Your Home list is empty.")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Japan news" })).toBeVisible();
+  expect(await savedSettings(page)).toEqual(before);
+});
+
+test("settings: failed saves leave the saved key and list intact", async ({
+  page,
+}) => {
+  await openHome(page);
+  const before = await savedSettings(page);
+  await openSettings(page);
+  await page.getByLabel("API key", { exact: true }).fill("unsaved-key");
+  await page.getByLabel("Search query").fill("unsaved query");
+  await page.evaluate(() => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === "tv.snapshot.v1") throw new Error("storage full");
+      setItem.call(this, key, value);
+    };
+  });
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Cannot save on this device",
+  );
+  expect(await savedSettings(page)).toEqual(before);
+  await expect(
+    page.getByRole("heading", { name: "Settings", exact: true }),
+  ).toBeVisible();
+});
+
+test("settings: editing an existing search replaces its conditions while Home playback still works", async ({
+  page,
+}) => {
+  await openHome(page);
+  await openSettings(page);
+  const row = page.getByRole("group", { name: "1. Japan news", exact: true });
+  await row.getByLabel("Search query").fill("edited search");
+  await row.getByLabel("Candidate order").selectOption("date");
+  await row.getByLabel("Minimum duration (seconds)").fill("600");
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: /News story 1,/ }).first(),
+  ).toBeVisible();
+  const saved = await savedSettings(page);
+  expect(saved.config.rows[0].search).toMatchObject({
+    query: "edited search",
+    order: "date",
+    minDurationSeconds: 600,
+  });
+  await page
+    .getByRole("button", { name: /News story 1,/ })
+    .first()
+    .click();
+  await expect(page.locator("iframe")).toHaveAttribute(
+    "src",
+    /embed\/video000000\?/,
+  );
+  await page.getByRole("button", { name: "Back to home" }).click();
+  await expect(
+    page.getByRole("button", { name: /News story 1,/ }).first(),
+  ).toBeFocused();
 });

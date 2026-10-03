@@ -4,26 +4,34 @@ A small, offline-first YouTube interface for a Mac connected to a TV. React, Typ
 
 **Open:** https://yusukeshib.github.io/tv/
 
-The home screen contains only horizontal video rows defined in config.json. There is no search box or local preset editor. Search conditions select the candidate videos; the retrieved candidates are displayed newest first. Scroll sideways for more; no categories, sorting menus, or “view all” screens.
+The home screen contains horizontal video rows and a single **gear icon**. Open the gear to edit the Home list and all settings locally: add/edit searches or channels, delete any row (including defaults), and Load/Dump a complete settings JSON. There is no Home search box or Cmd+K popup. Search conditions select the candidate videos; the retrieved candidates are displayed newest first. Scroll sideways for more; no categories or “view all” screens.
 
 ## First run
 
 1. In [Google Cloud](https://console.cloud.google.com/), create/select a project and enable **YouTube Data API v3**.
 2. Create an API key. Set **Website / HTTP referrer restrictions** to `https://yusukeshib.github.io/*` and **API restrictions** to **YouTube Data API v3**. For local development, add `http://localhost:5173/*` or the exact development origin you use.
-3. Open TV and enter the key once. It stays in that browser’s localStorage, not in GitHub, config.json, or the deployed JavaScript. Requests send it directly to Google.
+3. Open TV and enter the key once, or choose **Open settings / Load JSON** to import a settings file. The key stays with your settings in that browser’s localStorage, not in the public repository or deployed JavaScript. Requests send it directly to Google. A settings Dump includes the key; keep that JSON private.
 4. Put Chrome in fullscreen and connect the Mac to the TV over HDMI.
 
-To replace the key later, open `https://yusukeshib.github.io/tv/#setup` directly. There is intentionally no settings link on the home screen.
+To replace the key later, open the Home gear or `https://yusukeshib.github.io/tv/#/settings`. The first-run screen is also available at `#/setup` (`#setup` links remain supported).
 
 Browser storage is **not a secret vault**. Someone using the device, or JavaScript on the same origin, can access the key. GitHub Pages projects under `yusukeshib.github.io` share an origin; paths do not isolate secrets or HTTP referrer restrictions. Use a dedicated, restricted browser key, not a key used by other projects. Do not commit keys.
 
-## Configure from another computer
+## Defaults and local settings
 
-Edit [`public/config.json`](public/config.json), then commit and push to `main`:
+[`public/config.json`](public/config.json) supplies the default Home list. Until you save local settings, the app checks these defaults every minute. After **Save settings**, your local document is authoritative: GitHub changes never overwrite your searches, conditions or deletions. Deleting every row is valid and the defaults do not reappear on reload.
+
+The public defaults contain no API key. To change the defaults for devices that have not saved local settings, edit this file, then commit and push to `main`:
 
 ```json
 {
   "version": 1,
+  "searchDefaults": {
+    "order": "relevance",
+    "timeRange": "all",
+    "maxResults": 25,
+    "minDurationSeconds": 240
+  },
   "rows": [
     {
       "id": "japan-news",
@@ -51,6 +59,34 @@ Edit [`public/config.json`](public/config.json), then commit and push to `main`:
 
 Replace the example channel ID with a real channel ID (`UC` followed by 22 characters), not an `@handle`. Keep row IDs stable and unique. Reorder the array to reorder the home screen. An empty array is valid. Search queries can use any language; the interface is English.
 
+### Edit, Load and Dump
+
+The gear opens an editor with:
+
+- **API key**.
+- **Search defaults**: candidate order, time range, language preference, region, page size and minimum duration. New search rows copy these defaults; changing defaults does not rewrite existing searches.
+- **Home list**: add searches/channels, edit labels and each row’s conditions, or delete rows. Defaults are ordinary editable/deletable rows.
+- **Load JSON** replaces the editor’s draft after validation, including the key and search defaults. **Save settings** applies everything together. **Cancel** leaves the saved settings unchanged. An invalid file or failed storage write does not partially apply changes.
+- **Dump JSON** downloads the current valid draft, including unsaved edits. It contains every user setting, but no cached video metadata, quota cooldowns or navigation state.
+
+The complete portable document looks like this (an empty `rows` array means an empty Home list):
+
+```json
+{
+  "version": 1,
+  "apiKey": "YOUR_PRIVATE_BROWSER_KEY",
+  "searchDefaults": {
+    "order": "relevance",
+    "timeRange": "all",
+    "maxResults": 25,
+    "minDurationSeconds": 240
+  },
+  "rows": []
+}
+```
+
+Optional `relevanceLanguage` and `regionCode` belong in `searchDefaults` and/or a search row’s `search` object. Load accepts complete settings files up to 256 KB, with at most 50 rows. It replaces rather than merges the list. Keep Dump files private: **they contain your API key. Never commit them to GitHub.** There is no migration of the old separately stored API key in this development phase; re-enter your key if prompted.
+
 Each search row has its own retrieval settings:
 
 - `query`: search text.
@@ -65,13 +101,13 @@ Home excludes videos shorter than four minutes by default, including on channel 
 
 The bundled config uses five specific channels (BBC News, Reuters, Marques Brownlee, Veritasium, and NASA) rather than broad keyword searches. The search example above retrieves the most-viewed candidates published in the past seven days, then displays those candidates newest first. This does not guarantee editorial quality or represent every video published in that time range. Loading additional pages fetches more candidates using the same settings and re-sorts the retrieved set by publication time.
 
-Navigation uses React Router hash routes so GitHub Pages needs no server rewrite rules: `#/` for Home, `#/watch/:videoId` for playback, and `#/setup` for setup (`#setup` links remain supported). Browser Back/Forward and the player's Back/Escape restore Home's vertical and per-row horizontal scroll. Playback URLs resolve metadata from the saved library; unavailable videos show a Home link rather than fetching arbitrary provider metadata. URLs never include API keys.
+Navigation uses React Router hash routes so GitHub Pages needs no server rewrite rules: `#/` for Home, `#/settings` for settings, `#/watch/:videoId` for playback, and `#/setup` for setup (`#setup` links remain supported). Browser Back/Forward and the player's Back/Escape restore Home's vertical and per-row horizontal scroll. Playback URLs resolve metadata from the saved library; unavailable videos show a Home link rather than fetching arbitrary provider metadata. URLs never include API keys.
 
 Home keyboard scrolling is axis-specific: Left/Right reveal the selected card within that row without changing vertical scroll; Up/Down reveal the row heading and cards with focus-ring clearance. Navigating to the first selectable row resets vertical scroll to zero. Playback/history/reload restoration takes priority over that rule, preserving the exact saved offsets. Background updates retain the selected video and do not override manual scrolling.
 
-Changing any retrieval setting invalidates that row’s cached results and pagination tokens. Config is the only source of presets; old ad-hoc search data is removed from local storage.
+Changing any row’s retrieval setting invalidates that row’s cached results and pagination tokens. Changing a label, row order or search defaults preserves unchanged row caches. Removed rows lose their cached metadata. No provider requests run for draft edits; new/changed rows fetch after Save.
 
-The deployed browser reads the **raw GitHub file**, not the cached Pages app, every minute while visible. The development server reads the local `public/config.json` instead, so unpushed edits can be previewed. GitHub/CDN delays can still affect freshness. Invalid config leaves the previous valid config in place. New or changed rows load immediately; changing only labels or order reuses saved videos.
+Before the first local settings save, the deployed browser reads the **raw GitHub defaults**, not the cached Pages app, every minute while visible. The development server reads the local `public/config.json` instead. GitHub/CDN delays can still affect freshness. Invalid defaults leave the previous valid config in place. Once settings are saved locally, remote defaults reads stop; video and app refreshes continue.
 
 This is a manually maintained channel list, not a sync of your signed-in YouTube subscriptions or personalized recommendations. No Google sign-in is required by this app. The official player may separately ask you to sign in for some content.
 
@@ -87,10 +123,10 @@ Mouse/trackpad input also works. A dedicated phone remote, HDMI-CEC control, and
 
 ## Refresh and quotas
 
-- **Config:** every minute while the page is visible.
+- **Default config:** every minute while visible, until settings are saved locally. Local settings are not remotely overwritten.
 - **Video rows:** every 10 minutes while visible. Changed search settings and additional pages are separate requests.
 - **App:** check for an updated service worker every minute. Download the complete new HTML/JS/CSS before activating it. If a video is open, wait until returning home, then reload once.
-- **Resume:** check config and refresh overdue rows when the page becomes visible or connectivity returns.
+- **Resume:** check defaults if still using them, and refresh overdue rows when the page becomes visible or connectivity returns.
 
 As documented by YouTube, the standard project allowance is **100 `search.list` calls/day**, with a separate **10,000-unit/day** bucket for most other endpoints. Check your actual project quotas; they may differ. One search row used for six hours at a 10-minute interval needs about 36 calls; two need about 72, **plus startup, config changes, and pagination**. Usage is shared across devices using the same project. Channel rows use the uploads playlist rather than the search endpoint.
 
@@ -101,7 +137,7 @@ Chrome can throttle timers, and no page code runs while the Mac sleeps or Chrome
 ## Offline behavior
 
 - **App shell:** service worker + Cache Storage; launches locally after one successful online visit and installation.
-- **Config and video metadata:** localStorage is the display source of truth. Fetches are validated and saved before notifying React. Failed fetches/writes do not replace the current list.
+- **Settings (including API key) and video metadata:** localStorage is the display source of truth. A single snapshot write commits the settings atomically before notifying React. Failed fetches/writes do not replace the current list.
 - **Thumbnails:** bounded best-effort Cache Storage (250 images, up to 29 days).
 - **Video metadata:** expired after 29 days, not kept indefinitely. The app removes expired entries when running.
 - **Navigation state:** sessionStorage restores selection/scroll across an app-update reload.
@@ -134,7 +170,7 @@ UI styles use StyleX compiled at build time. The list uses Material 3 dark surfa
 
 The `Deploy TV` GitHub Actions workflow builds with Bun and publishes `dist` to GitHub Pages on pushes to `main`. Repository **Settings → Pages → Source** must be **GitHub Actions**. The default base path is `/tv/`; if forking, update `src/sync.ts`’s public config URL, the Pages base path in `vite.config.ts`, and your API key’s website restrictions.
 
-Rollback by reverting the relevant commit and pushing normally. The reverted build is delivered as a new service-worker update. Revert config changes similarly. Clearing site data is a last-resort recovery step: it deletes the saved key, lists, and offline copy.
+Rollback by reverting the relevant commit and pushing normally. The reverted build is delivered as a new service-worker update. Dump your local settings privately before rolling back to an older config-authoritative build; old builds may overwrite the list and may require re-entering the key. Revert public default-config changes similarly. Clearing site data is a last-resort recovery step: it deletes the saved key, lists, and offline copy.
 
 ## Validation limits
 

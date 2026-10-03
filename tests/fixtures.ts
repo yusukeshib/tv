@@ -35,6 +35,7 @@ export const cached = (
 });
 export const snapshot = (result = cached()): Snapshot => ({
   version: 1,
+  apiKey: "key",
   config: { version: 1, rows: [row] },
   rows: { news: result },
 });

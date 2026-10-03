@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  API_KEY,
   createStore,
   definitionKey,
   emptySnapshot,
   parseConfig,
+  parseSettings,
   readSnapshot,
   RETENTION_MS,
   SNAPSHOT_KEY,
 } from "../src/store";
 import { cached, memoryStorage, row, snapshot } from "./fixtures";
+import { DEFAULT_SEARCH_OPTIONS } from "../src/types";
 
 describe("snapshot storage", () => {
   it("normalizes options and makes every retrieval setting part of the cache key", () => {
@@ -110,7 +111,7 @@ describe("snapshot storage", () => {
     expect(() => store.save(snapshot())).toThrow("Cannot save on this device");
     expect(store.getSnapshot()).toBe(before);
     expect(listener).not.toHaveBeenCalled();
-    expect(() => store.setKey("key")).toThrow("Cannot save your API key");
+    expect(() => store.setKey("key")).toThrow("Cannot save on this device");
   });
 
   it("rejects unsafe IDs and duplicates, and normalizes valid queries and API keys", () => {
@@ -135,7 +136,8 @@ describe("snapshot storage", () => {
     const storage = memoryStorage();
     const store = createStore(storage);
     store.setKey(" key ");
-    expect(storage.getItem(API_KEY)).toBe("key");
+    expect(store.getKey()).toBe("key");
+    expect(JSON.parse(storage.getItem(SNAPSHOT_KEY)!).apiKey).toBe("key");
     expect(() => store.setKey(" ")).toThrow("Enter your API key");
   });
 
@@ -182,5 +184,162 @@ describe("snapshot storage", () => {
     expect(store.getSnapshot().rows.news).toBeDefined();
     store.prune(now + 1);
     expect(store.getSnapshot().rows).toEqual({});
+  });
+});
+
+describe("complete local settings", () => {
+  it("round-trips the key, defaults and rows without exporting caches or ownership", () => {
+    const storage = memoryStorage({
+      [SNAPSHOT_KEY]: JSON.stringify(snapshot()),
+    });
+    const store = createStore(storage);
+    const settings = {
+      ...store.getSettings(),
+      apiKey: " new-key ",
+      searchDefaults: {
+        ...DEFAULT_SEARCH_OPTIONS,
+        order: "viewCount" as const,
+        timeRange: "7d" as const,
+        relevanceLanguage: " JA ",
+        regionCode: " jp ",
+        maxResults: 50,
+        minDurationSeconds: 0,
+      },
+    };
+    store.saveSettings(settings);
+    const dumped = JSON.parse(JSON.stringify(store.getSettings()));
+    expect(dumped).toEqual({
+      version: 1,
+      apiKey: "new-key",
+      rows: [row],
+      searchDefaults: {
+        order: "viewCount",
+        timeRange: "7d",
+        relevanceLanguage: "ja",
+        regionCode: "JP",
+        maxResults: 50,
+        minDurationSeconds: 0,
+      },
+    });
+    const restored = createStore(memoryStorage());
+    restored.saveSettings(dumped);
+    expect(restored.getSettings()).toEqual(dumped);
+    expect(createStore(storage).getSettings()).toEqual(dumped);
+    expect(store.getSnapshot().rows.news).toBeDefined();
+  });
+
+  it("commits all settings in one write before notifying, including an empty local list", () => {
+    const storage = memoryStorage({
+      [SNAPSHOT_KEY]: JSON.stringify(snapshot()),
+    });
+    const store = createStore(storage);
+    vi.mocked(storage.setItem).mockClear();
+    const listener = vi.fn(() => {
+      expect(JSON.parse(storage.getItem(SNAPSHOT_KEY)!)).toEqual(
+        store.getSnapshot(),
+      );
+      expect(store.getKey()).toBe("replacement");
+    });
+    store.subscribe(listener);
+    store.saveSettings({
+      ...store.getSettings(),
+      apiKey: "replacement",
+      rows: [],
+    });
+    expect(storage.setItem).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledOnce();
+    const reloaded = createStore(storage);
+    expect(reloaded.getSnapshot()).toMatchObject({
+      localConfig: true,
+      rows: {},
+      config: { rows: [] },
+    });
+    expect(reloaded.getKey()).toBe("replacement");
+  });
+
+  it("preserves only unchanged retrieval caches when lists are edited", () => {
+    const store = createStore(
+      memoryStorage({ [SNAPSHOT_KEY]: JSON.stringify(snapshot()) }),
+    );
+    store.saveSettings({
+      ...store.getSettings(),
+      rows: [{ ...row, label: "Renamed" }],
+    });
+    expect(store.getSnapshot().rows.news).toBeDefined();
+    store.saveSettings({
+      ...store.getSettings(),
+      rows: [{ ...row, search: { ...row.search, query: "changed" } }],
+    });
+    expect(store.getSnapshot().rows).toEqual({});
+  });
+
+  it("invalid JSON settings and storage failures never partially change key or list", () => {
+    const storage = memoryStorage({
+      [SNAPSHOT_KEY]: JSON.stringify(snapshot()),
+    });
+    const store = createStore(storage);
+    const before = store.getSnapshot();
+    const persisted = storage.getItem(SNAPSHOT_KEY);
+    const listener = vi.fn();
+    store.subscribe(listener);
+    for (const invalid of [
+      { ...store.getSettings(), apiKey: "" },
+      { ...store.getSettings(), searchDefaults: undefined },
+      {
+        ...store.getSettings(),
+        searchDefaults: { ...DEFAULT_SEARCH_OPTIONS, maxResults: 51 },
+      },
+      {
+        ...store.getSettings(),
+        searchDefaults: { ...DEFAULT_SEARCH_OPTIONS, minDurationSeconds: -1 },
+      },
+      { ...store.getSettings(), rows: [row, row] },
+    ]) {
+      expect(() => store.saveSettings(invalid)).toThrow();
+      expect(store.getSnapshot()).toBe(before);
+    }
+    vi.mocked(storage.setItem).mockImplementation(() => {
+      throw new Error("full");
+    });
+    expect(() =>
+      store.saveSettings({
+        ...store.getSettings(),
+        apiKey: "changed",
+        rows: [],
+      }),
+    ).toThrow("Cannot save on this device");
+    expect(store.getSnapshot()).toBe(before);
+    expect(storage.getItem(SNAPSHOT_KEY)).toBe(persisted);
+    expect(store.getKey()).toBe("key");
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("keeps user settings through pruning and ignores unrecognized imported fields", () => {
+    const now = Date.now();
+    const store = createStore(
+      memoryStorage({
+        [SNAPSHOT_KEY]: JSON.stringify(
+          snapshot(cached(now - RETENTION_MS + 1)),
+        ),
+      }),
+    );
+    store.saveSettings({
+      ...store.getSettings(),
+      searchDefaults: { ...DEFAULT_SEARCH_OPTIONS, order: "date" },
+      rows: [row],
+    });
+    store.prune(now + 1);
+    expect(store.getSettings().searchDefaults.order).toBe("date");
+    expect(store.getSnapshot()).toMatchObject({
+      apiKey: "key",
+      localConfig: true,
+      rows: {},
+    });
+    expect(
+      parseSettings({
+        ...store.getSettings(),
+        cachedVideos: ["secret-runtime-data"],
+      }),
+    ).toEqual(store.getSettings());
   });
 });

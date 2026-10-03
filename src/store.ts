@@ -4,12 +4,12 @@ import type {
   RowDefinition,
   Snapshot,
   SearchOptions,
+  SettingsData,
   Video,
 } from "./types";
-import { DEFAULT_MIN_DURATION_SECONDS } from "./types";
+import { DEFAULT_MIN_DURATION_SECONDS, DEFAULT_SEARCH_OPTIONS } from "./types";
 
 export const SNAPSHOT_KEY = "tv.snapshot.v1";
-export const API_KEY = "tv.youtube-key";
 export const RETENTION_MS = 29 * 24 * 60 * 60 * 1000;
 export const emptySnapshot = (): Snapshot => ({
   version: 1,
@@ -24,6 +24,49 @@ const text = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0 && value.length <= 500;
 const object = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+function parseSearchOptions(options: unknown): SearchOptions {
+  if (
+    !object(options) ||
+    !text(options.query) ||
+    typeof options.order !== "string" ||
+    !["relevance", "viewCount", "rating", "date"].includes(options.order) ||
+    typeof options.timeRange !== "string" ||
+    !["24h", "7d", "30d", "all"].includes(options.timeRange) ||
+    !Number.isInteger(options.maxResults) ||
+    (options.maxResults as number) < 1 ||
+    (options.maxResults as number) > 50 ||
+    (options.minDurationSeconds !== undefined &&
+      (!Number.isSafeInteger(options.minDurationSeconds) ||
+        (options.minDurationSeconds as number) < 0)) ||
+    (options.relevanceLanguage !== undefined &&
+      (typeof options.relevanceLanguage !== "string" ||
+        !/^[a-zA-Z]{2,3}(?:-[a-zA-Z]{2,4})?$/.test(
+          options.relevanceLanguage.trim(),
+        ))) ||
+    (options.regionCode !== undefined &&
+      (typeof options.regionCode !== "string" ||
+        !/^[a-zA-Z]{2}$/.test(options.regionCode.trim())))
+  )
+    throw new Error(
+      "Check the search options: query, order, time range, language, region, page size and minimum duration.",
+    );
+  return {
+    query: options.query.trim(),
+    order: options.order as SearchOptions["order"],
+    timeRange: options.timeRange as SearchOptions["timeRange"],
+    maxResults: options.maxResults as number,
+    ...(options.minDurationSeconds !== undefined
+      ? { minDurationSeconds: options.minDurationSeconds as number }
+      : {}),
+    ...(typeof options.relevanceLanguage === "string"
+      ? { relevanceLanguage: options.relevanceLanguage.trim().toLowerCase() }
+      : {}),
+    ...(typeof options.regionCode === "string"
+      ? { regionCode: options.regionCode.trim().toUpperCase() }
+      : {}),
+  };
+}
 
 export function parseConfig(value: unknown): Config {
   if (
@@ -48,46 +91,7 @@ export function parseConfig(value: unknown): Config {
               maxResults: 25,
             }
           : row.search;
-      if (
-        !object(options) ||
-        !text(options.query) ||
-        typeof options.order !== "string" ||
-        !["relevance", "viewCount", "rating", "date"].includes(options.order) ||
-        typeof options.timeRange !== "string" ||
-        !["24h", "7d", "30d", "all"].includes(options.timeRange) ||
-        !Number.isInteger(options.maxResults) ||
-        (options.maxResults as number) < 1 ||
-        (options.maxResults as number) > 50 ||
-        (options.minDurationSeconds !== undefined &&
-          (!Number.isSafeInteger(options.minDurationSeconds) ||
-            (options.minDurationSeconds as number) < 0)) ||
-        (options.relevanceLanguage !== undefined &&
-          (typeof options.relevanceLanguage !== "string" ||
-            !/^[a-zA-Z]{2,3}(?:-[a-zA-Z]{2,4})?$/.test(
-              options.relevanceLanguage.trim(),
-            ))) ||
-        (options.regionCode !== undefined &&
-          (typeof options.regionCode !== "string" ||
-            !/^[a-zA-Z]{2}$/.test(options.regionCode.trim())))
-      )
-        throw new Error("Check the search options in config.json.");
-      const search: SearchOptions = {
-        query: options.query.trim(),
-        order: options.order as SearchOptions["order"],
-        timeRange: options.timeRange as SearchOptions["timeRange"],
-        maxResults: options.maxResults as number,
-        ...(options.minDurationSeconds !== undefined
-          ? { minDurationSeconds: options.minDurationSeconds as number }
-          : {}),
-        ...(typeof options.relevanceLanguage === "string"
-          ? {
-              relevanceLanguage: options.relevanceLanguage.trim().toLowerCase(),
-            }
-          : {}),
-        ...(typeof options.regionCode === "string"
-          ? { regionCode: options.regionCode.trim().toUpperCase() }
-          : {}),
-      };
+      const search = parseSearchOptions(options);
       return { id: row.id, label: row.label, type: "search", search };
     }
     if (
@@ -103,7 +107,30 @@ export function parseConfig(value: unknown): Config {
       };
     throw new Error("Check the search query or channel ID.");
   });
-  return { version: 1, rows };
+  let searchDefaults;
+  if (value.searchDefaults !== undefined) {
+    if (!object(value.searchDefaults))
+      throw new Error("Check the search defaults.");
+    const { query: _, ...defaults } = parseSearchOptions({
+      ...value.searchDefaults,
+      query: "defaults",
+    });
+    searchDefaults = { ...DEFAULT_SEARCH_OPTIONS, ...defaults };
+  }
+  return { version: 1, rows, ...(searchDefaults ? { searchDefaults } : {}) };
+}
+
+export function parseSettings(value: unknown): SettingsData {
+  const config = parseConfig(value);
+  if (!object(value) || !text(value.apiKey))
+    throw new Error("Enter your API key.");
+  if (!config.searchDefaults)
+    throw new Error("The settings JSON must include searchDefaults.");
+  return {
+    ...config,
+    apiKey: value.apiKey.trim(),
+    searchDefaults: config.searchDefaults,
+  };
 }
 
 export const definitionKey = (row: RowDefinition): string =>
@@ -170,7 +197,13 @@ export function readSnapshot(
         if (cached) rows[row.id] = cached;
       }
     // Discard legacy ad-hoc searches; only config-defined rows belong in the cache.
-    return { version: 1, config, rows };
+    return {
+      version: 1,
+      config,
+      rows,
+      ...(typeof raw.apiKey === "string" ? { apiKey: raw.apiKey } : {}),
+      ...(raw.localConfig === true ? { localConfig: true } : {}),
+    };
   } catch {
     return emptySnapshot();
   }
@@ -211,22 +244,27 @@ export function createStore(storage: Storage) {
       snapshot = next;
       listeners.forEach((listener) => listener());
     },
-    getKey() {
-      try {
-        return storage.getItem(API_KEY) || "";
-      } catch {
-        return "";
-      }
-    },
+    getKey: () => snapshot.apiKey || "",
+    getSettings: (): SettingsData => ({
+      ...snapshot.config,
+      searchDefaults: {
+        ...(snapshot.config.searchDefaults ?? DEFAULT_SEARCH_OPTIONS),
+      },
+      apiKey: snapshot.apiKey || "",
+    }),
     setKey(key: string) {
-      if (!key.trim()) throw new Error("Enter your API key.");
-      try {
-        storage.setItem(API_KEY, key.trim());
-      } catch {
-        throw new Error(
-          "Cannot save your API key. Check Chrome storage settings.",
-        );
+      if (!text(key)) throw new Error("Enter your API key.");
+      this.save({ ...snapshot, apiKey: key.trim() });
+    },
+    saveSettings(value: unknown) {
+      const { apiKey, ...config } = parseSettings(value);
+      const rows: Snapshot["rows"] = {};
+      for (const row of config.rows) {
+        const cached = snapshot.rows[row.id];
+        if (cached?.definitionKey === definitionKey(row)) rows[row.id] = cached;
       }
+      // One write commits the key, defaults, list and ownership together.
+      this.save({ version: 1, apiKey, localConfig: true, config, rows });
     },
     prune(now = Date.now()) {
       const rows = Object.fromEntries(

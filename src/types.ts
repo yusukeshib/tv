@@ -11,6 +11,15 @@ export interface SearchOptions {
   minDurationSeconds?: number;
 }
 
+export type SearchDefaults = Omit<SearchOptions, "query">;
+
+export const DEFAULT_SEARCH_OPTIONS: SearchDefaults = {
+  order: "relevance",
+  timeRange: "all",
+  maxResults: 25,
+  minDurationSeconds: DEFAULT_MIN_DURATION_SECONDS,
+};
+
 export type RowDefinition =
   | { id: string; label: string; type: "search"; search: SearchOptions }
   | { id: string; label: string; type: "channel"; channelId: string };
@@ -18,6 +27,13 @@ export type RowDefinition =
 export interface Config {
   version: 1;
   rows: RowDefinition[];
+  searchDefaults?: SearchDefaults;
+}
+
+// The complete portable settings document; contains the secret API key.
+export interface SettingsData extends Config {
+  apiKey: string;
+  searchDefaults: SearchDefaults;
 }
 
 export interface Video {
@@ -43,6 +59,8 @@ export interface CachedRow extends VideoPage {
 
 export interface Snapshot {
   version: 1;
+  apiKey?: string;
+  localConfig?: boolean;
   config: Config;
   rows: Record<string, CachedRow>;
 }
@@ -58,6 +76,7 @@ export interface HomeProps {
   rows: DisplayRow[];
   onPlay: (video: Video) => void;
   onLoadMore: (rowId: string) => void;
+  onSettings: () => void;
   loadingRows: readonly string[];
   notice?: string;
   hidden?: boolean;

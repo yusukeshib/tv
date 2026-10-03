@@ -1,5 +1,11 @@
 {
   "version": 1,
+  "searchDefaults": {
+    "order": "relevance",
+    "timeRange": "all",
+    "maxResults": 25,
+    "minDurationSeconds": 240
+  },
   "rows": [
     {
       "id": "bbc-news",

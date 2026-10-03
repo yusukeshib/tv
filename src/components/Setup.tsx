@@ -3,10 +3,12 @@ import * as stylex from "@stylexjs/stylex";
 export function Setup({
   initialKey = "",
   onSave,
+  onSettings,
   error,
 }: {
   initialKey?: string;
   onSave: (key: string) => void;
+  onSettings: () => void;
   error?: string;
 }) {
   const [key, setKey] = useState(initialKey);
@@ -59,6 +61,13 @@ export function Setup({
             Save and start →
           </button>
         </form>
+        <button
+          type="button"
+          onClick={onSettings}
+          {...stylex.props(styles.button)}
+        >
+          Open settings / Load JSON
+        </button>
         <div id="key-guidance" {...stylex.props(styles.guidance)}>
           <p>
             Enable YouTube Data API v3 in Google Cloud. Restrict your browser

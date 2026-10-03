@@ -37,6 +37,7 @@ export function Home({
   rows,
   onPlay,
   onLoadMore,
+  onSettings,
   loadingRows,
   notice,
   hidden = false,
@@ -48,6 +49,8 @@ export function Home({
   );
   const buttons = useRef(new Map<string, HTMLButtonElement>());
   const home = useRef<HTMLElement>(null);
+  const settingsButton = useRef<HTMLButtonElement>(null);
+  const gearHadFocus = useRef(false);
   const requested = useRef(
     new Map<string, { signature: string; at: number }>(),
   );
@@ -91,6 +94,18 @@ export function Home({
     };
   }, [hidden]);
   useLayoutEffect(() => {
+    if (!hidden && wasHidden.current && gearHadFocus.current) {
+      settingsButton.current?.focus({ preventScroll: true });
+      if (playbackView.current) {
+        const view = playbackView.current;
+        home.current
+          ?.querySelectorAll<HTMLElement>("[data-row-scroll]")
+          .forEach((track) => {
+            track.scrollLeft = view.tracks[track.dataset.rowScroll!] ?? 0;
+          });
+        window.scrollTo({ top: view.top });
+      }
+    }
     const current = selectionRef.current;
     const row =
       rows.find((r) => r.id === current?.row && r.videos.length) ??
@@ -118,6 +133,7 @@ export function Home({
       const node = buttons.current.get(key(row.id, video.id));
       if (
         !hidden &&
+        !gearHadFocus.current &&
         node &&
         (cardHadFocus.current || wasHidden.current || restorePending.current)
       ) {
@@ -146,7 +162,11 @@ export function Home({
           scrollSelection(node, rows.indexOf(row), true);
         }
       }
-    } else if (!hidden && (cardHadFocus.current || wasHidden.current))
+    } else if (
+      !hidden &&
+      !gearHadFocus.current &&
+      (cardHadFocus.current || wasHidden.current)
+    )
       home.current?.focus();
     wasHidden.current = hidden;
   }, [rows, hidden]);
@@ -198,7 +218,29 @@ export function Home({
     node.focus({ preventScroll: true });
     scrollSelection(node, rowIndex, vertical);
   }
+  function rememberView() {
+    const tracks: Record<string, number> = {};
+    home.current
+      ?.querySelectorAll<HTMLElement>("[data-row-scroll]")
+      .forEach((track) => {
+        tracks[track.dataset.rowScroll!] = track.scrollLeft;
+      });
+    playbackView.current = { top: window.scrollY, tracks };
+    if (!selectionRef.current) return;
+    try {
+      sessionStorage.setItem(
+        "tv.view",
+        JSON.stringify({
+          ...playbackView.current,
+          selection: selectionRef.current,
+        }),
+      );
+    } catch {
+      /* View restoration is optional. */
+    }
+  }
   function navigate(event: KeyboardEvent) {
+    if (event.target === settingsButton.current) return;
     const current = selectionRef.current;
     if (!current) return;
     const rowIndex = rows.findIndex((r) => r.id === current.row);
@@ -239,6 +281,39 @@ export function Home({
           cardHadFocus.current = false;
       }}
     >
+      <div {...stylex.props(styles.toolbar)}>
+        <button
+          ref={settingsButton}
+          type="button"
+          aria-label="Settings"
+          title="Settings"
+          {...stylex.props(styles.gear)}
+          onFocus={() => {
+            gearHadFocus.current = true;
+            cardHadFocus.current = false;
+          }}
+          onClick={() => {
+            rememberView();
+            onSettings();
+          }}
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <path
+              d="m9 3 1-2h4l1 2 2 1 2-.2 2 3.4-1.2 1.8v3.9l1.2 1.8-2 3.4-2-.2-2 1-1 2h-4l-1-2-2-1-2 .2-2-3.4L4.2 14v-3.9L3 8.3l2-3.4 2 .2Z"
+              transform="translate(0 1)"
+            />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
+      </div>
       {notice && (
         <p {...stylex.props(styles.notice)} role="status">
           {notice}
@@ -258,6 +333,7 @@ export function Home({
             }}
             onFocus={(video) => {
               cardHadFocus.current = true;
+              gearHadFocus.current = false;
               const next = {
                 row: row.id,
                 video: video.id,
@@ -267,24 +343,7 @@ export function Home({
               setSelected(next);
             }}
             onPlay={(video) => {
-              const tracks: Record<string, number> = {};
-              home.current
-                ?.querySelectorAll<HTMLElement>("[data-row-scroll]")
-                .forEach((track) => {
-                  tracks[track.dataset.rowScroll!] = track.scrollLeft;
-                });
-              playbackView.current = { top: window.scrollY, tracks };
-              try {
-                sessionStorage.setItem(
-                  "tv.view",
-                  JSON.stringify({
-                    ...playbackView.current,
-                    selection: selectionRef.current,
-                  }),
-                );
-              } catch {
-                /* View restoration is optional. */
-              }
+              rememberView();
               onPlay(video);
             }}
             onNearEnd={() => {
@@ -305,7 +364,7 @@ export function Home({
       </div>
       {!rows.length && (
         <p {...stylex.props(styles.notice)}>
-          Add a row in config.json to get started.
+          Open Settings to add a search or channel.
         </p>
       )}
     </main>
@@ -318,6 +377,26 @@ const styles = stylex.create({
     color: theme.onSurface,
     paddingBlock: theme.pageInset,
     outline: "none",
+  },
+  toolbar: {
+    display: "flex",
+    justifyContent: "flex-end",
+    paddingInline: theme.gutter,
+    marginBottom: 12,
+  },
+  gear: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 44,
+    height: 44,
+    padding: 0,
+    color: theme.onSurfaceVariant,
+    backgroundColor: "transparent",
+    border: 0,
+    borderRadius: 8,
+    outline: { default: "none", ":focus-visible": `3px solid ${theme.focus}` },
+    outlineOffset: 3,
   },
   notice: {
     color: theme.onSurfaceVariant,
