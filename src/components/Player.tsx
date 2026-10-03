@@ -172,7 +172,7 @@ export function Player({
       if (enabled)
         seek(
           (pendingSeek.current ?? player.current?.getCurrentTime() ?? 0) +
-            (event.key === "ArrowRight" ? 5 : -5),
+            (event.key === "ArrowRight" ? 5 : -5) * (event.shiftKey ? 10 : 1),
         );
     } else if (event.code === "Space" || event.key === " ") {
       event.preventDefault();

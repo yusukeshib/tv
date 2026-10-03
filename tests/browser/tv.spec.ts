@@ -177,6 +177,12 @@ test("seek batches arrow repeats, preserves the preview, and cancels on close", 
   ).toEqual([]);
   await page.keyboard.press("ArrowLeft");
   await expect(seek).toHaveValue("85");
+  await page.keyboard.press("Shift+ArrowRight");
+  await expect(seek).toHaveValue("135");
+  await page.keyboard.press("Shift+ArrowLeft");
+  await expect(seek).toHaveValue("85");
+  await page.keyboard.press("Shift+ArrowRight");
+  await expect(seek).toHaveValue("135");
   await page.clock.runFor(199);
   expect(
     await page.evaluate(
@@ -184,6 +190,11 @@ test("seek batches arrow repeats, preserves the preview, and cancels on close", 
     ),
   ).toEqual([]);
   await page.clock.runFor(1);
+  expect(
+    await page.evaluate(
+      "window.__playerMock.calls.filter(c => c.command === 'seek').at(-1).value",
+    ),
+  ).toBe(135);
   expect(
     await page.evaluate(
       "window.__playerMock.calls.filter(c => c.command === 'seek').length",
