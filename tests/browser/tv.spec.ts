@@ -185,6 +185,57 @@ test("keyboard selection plays and returns to the same card; only the settings g
   await page.screenshot({ path: "test-results/home.png" });
 });
 
+test("player: video covers the full viewport with controls overlaid at every aspect ratio", async ({
+  page,
+}) => {
+  await openHome(page);
+  await page
+    .getByRole("button", { name: /News story 1,/ })
+    .first()
+    .click();
+  const frame = page.locator("iframe");
+  await expect(frame).toBeVisible();
+  await expect(page.getByRole("slider", { name: "Seek" })).toBeEnabled();
+  for (const viewport of [
+    { width: 1920, height: 1080 },
+    { width: 2000, height: 700 },
+    { width: 900, height: 1200 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const overlay = (await page.getByRole("dialog").boundingBox())!;
+    const video = (await frame.boundingBox())!;
+    expect(overlay).toEqual({ x: 0, y: 0, ...viewport });
+    expect(video.x).toBeLessThanOrEqual(1);
+    expect(video.y).toBeLessThanOrEqual(1);
+    expect(video.x + video.width).toBeGreaterThanOrEqual(viewport.width - 1);
+    expect(video.y + video.height).toBeGreaterThanOrEqual(viewport.height - 1);
+    expect(Math.abs(video.width / video.height - 16 / 9)).toBeLessThan(0.001);
+    expect(
+      Math.abs(video.x + video.width / 2 - viewport.width / 2),
+    ).toBeLessThan(1);
+    expect(
+      Math.abs(video.y + video.height / 2 - viewport.height / 2),
+    ).toBeLessThan(1);
+    const back = page.getByRole("button", { name: "Back to home" });
+    const seek = page.getByRole("slider", { name: "Seek" });
+    await expect(back).toBeVisible();
+    await expect(seek).toBeVisible();
+    const backBox = (await back.boundingBox())!;
+    const seekBox = (await seek.boundingBox())!;
+    expect(backBox.y).toBeGreaterThanOrEqual(0);
+    expect(seekBox.y + seekBox.height).toBeLessThanOrEqual(viewport.height);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+  }
+  await page.getByRole("button", { name: "Back to home" }).click();
+  await expect(
+    page.getByRole("button", { name: /News story 1,/ }).first(),
+  ).toBeFocused();
+});
+
 test("seek batches arrow repeats, preserves the preview, and cancels on close", async ({
   page,
 }) => {

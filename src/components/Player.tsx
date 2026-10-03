@@ -124,7 +124,7 @@ export function Player({
         frame.tabIndex = -1;
         frame.referrerPolicy = "strict-origin-when-cross-origin";
         frame.style.cssText =
-          "position:absolute;inset:0;width:100%;height:100%;border:0;display:block";
+          "position:absolute;left:50%;top:50%;width:max(100vw,177.777778vh);height:max(100vh,56.25vw);transform:translate(-50%,-50%);border:0;display:block";
       })
       .catch((failure: unknown) => {
         if (!disposed)
@@ -242,14 +242,21 @@ const styles = stylex.create({
     zIndex: 100,
     backgroundColor: "#09090c",
     color: "#f5f5f7",
-    display: "flex",
-    flexDirection: "column",
-    padding: "clamp(16px, 2vw, 36px)",
-    gap: 18,
-    overflowY: "auto",
+    overflow: "hidden",
     fontFamily: "system-ui, sans-serif",
   },
-  header: { display: "flex", alignItems: "center", gap: 24, flexShrink: 0 },
+  header: {
+    position: "absolute",
+    insetInline: 0,
+    top: 0,
+    zIndex: 1,
+    display: "flex",
+    alignItems: "center",
+    padding: "clamp(16px, 2vw, 36px)",
+    backgroundImage:
+      "linear-gradient(to bottom, rgba(0,0,0,0.65), transparent)",
+    pointerEvents: "none",
+  },
   button: {
     color: "#fff",
     backgroundColor: "#272730",
@@ -259,6 +266,7 @@ const styles = stylex.create({
     paddingInline: 22,
     fontSize: "clamp(17px, 1.3vw, 24px)",
     whiteSpace: "nowrap",
+    pointerEvents: "auto",
     cursor: { default: "pointer", ":disabled": "default" },
     opacity: { default: 1, ":disabled": 0.4 },
     outline: {
@@ -268,19 +276,26 @@ const styles = stylex.create({
     outlineOffset: 4,
   },
   frameWrap: {
-    position: "relative",
-    flexGrow: 1,
-    minHeight: 220,
+    position: "absolute",
+    inset: 0,
+    overflow: "hidden",
     backgroundColor: "#000",
   },
   transport: {
+    position: "absolute",
+    insetInline: 0,
+    bottom: 0,
+    zIndex: 1,
     display: "flex",
     flexDirection: "column",
     gap: 12,
-    flexShrink: 0,
+    padding: "clamp(16px, 2vw, 36px)",
+    backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.8), transparent)",
+    pointerEvents: "none",
   },
   timeline: { display: "flex", alignItems: "center", gap: 16 },
   seek: {
+    pointerEvents: "auto",
     flexGrow: 1,
     minWidth: 40,
     height: 26,
@@ -295,6 +310,14 @@ const styles = stylex.create({
   },
   buttons: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 },
   error: {
+    position: "absolute",
+    insetInline: "clamp(16px, 2vw, 36px)",
+    top: "50%",
+    transform: "translateY(-50%)",
+    zIndex: 2,
+    padding: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.85)",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
