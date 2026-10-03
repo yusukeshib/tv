@@ -20,6 +20,10 @@ export function Player({
   const host = useRef<HTMLDivElement>(null);
   const overlay = useRef<HTMLDivElement>(null);
   const player = useRef<YouTubePlayer | null>(null);
+  const seekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const pendingSeek = useRef<number | null>(null);
   const close = useRef(onClose);
   close.current = onClose;
   const [attempt, setAttempt] = useState(0);
@@ -67,7 +71,8 @@ export function Player({
     setDuration(0);
     const update = () => {
       if (disposed || !instance) return;
-      setPosition(Math.max(0, instance.getCurrentTime() || 0));
+      if (pendingSeek.current === null)
+        setPosition(Math.max(0, instance.getCurrentTime() || 0));
       setDuration(Math.max(0, instance.getDuration() || 0));
     };
     void loadPlayerAPI()
@@ -105,6 +110,8 @@ export function Player({
 
             onError: ({ data }) => {
               if (disposed) return;
+              clearTimeout(seekTimer.current);
+              pendingSeek.current = null;
               setError(playbackError(data));
             },
           },
@@ -130,6 +137,8 @@ export function Player({
     return () => {
       disposed = true;
       clearInterval(timer);
+      clearTimeout(seekTimer.current);
+      pendingSeek.current = null;
       player.current = null;
       instance?.destroy();
     };
@@ -139,8 +148,14 @@ export function Player({
   const seek = (seconds: number) => {
     if (!enabled || !player.current || !duration) return;
     const next = Math.max(0, Math.min(duration, seconds));
-    player.current.seekTo(next, true);
+    pendingSeek.current = next;
     setPosition(next);
+    clearTimeout(seekTimer.current);
+    seekTimer.current = setTimeout(() => {
+      const target = pendingSeek.current;
+      pendingSeek.current = null;
+      if (target !== null) player.current?.seekTo(target, true);
+    }, 200);
   };
   const togglePlayback = () => {
     if (!enabled || !player.current) return;
@@ -156,7 +171,7 @@ export function Player({
       event.preventDefault();
       if (enabled)
         seek(
-          (player.current?.getCurrentTime() || 0) +
+          (pendingSeek.current ?? player.current?.getCurrentTime() ?? 0) +
             (event.key === "ArrowRight" ? 5 : -5),
         );
     } else if (event.code === "Space" || event.key === " ") {

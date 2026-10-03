@@ -66,7 +66,7 @@ const styles = stylex.create({
     border: "none",
     boxShadow: "none",
     appearance: "none",
-    backgroundColor: theme.surfaceContainerLow,
+    backgroundColor: theme.surface,
     color: theme.onSurface,
     textAlign: "left",
     cursor: "pointer",
@@ -74,7 +74,10 @@ const styles = stylex.create({
     outline: "none",
     outlineOffset: 4,
   },
-  active: { outline: `4px solid ${theme.focus}` },
+  active: {
+    outline: `6px solid ${theme.focus}`,
+    backgroundColor: theme.surfaceContainerLow,
+  },
   imageWrap: {
     aspectRatio: "16 / 9",
     overflow: "hidden",

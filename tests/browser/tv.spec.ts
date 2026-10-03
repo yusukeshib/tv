@@ -106,6 +106,11 @@ test("keyboard selection plays and returns to the same card; no management contr
   await page.keyboard.press("ArrowRight");
   const second = page.getByRole("button", { name: /News story 2,/ });
   await expect(second).toBeFocused();
+  await expect(second).toHaveCSS("outline-width", "6px");
+  await expect(second).toHaveCSS("background-color", "rgb(29, 27, 32)");
+  const unselected = page.getByRole("button", { name: /News story 1,/ });
+  await expect(unselected).toHaveCSS("outline-style", "none");
+  await expect(unselected).toHaveCSS("background-color", "rgb(20, 18, 24)");
   await page.keyboard.press("Enter");
   await expect(page.locator("iframe")).toHaveAttribute(
     "src",
@@ -145,6 +150,49 @@ test("keyboard selection plays and returns to the same card; no management contr
     page.getByRole("button", { name: /settings|view all|sort/i }),
   ).toHaveCount(0);
   await page.screenshot({ path: "test-results/home.png" });
+});
+
+test("seek batches arrow repeats, preserves the preview, and cancels on close", async ({
+  page,
+}) => {
+  await openHome(page);
+  await page.getByRole("button", { name: /News story 1,/ }).click();
+  const seek = page.getByRole("slider", { name: "Seek" });
+  await expect(seek).toBeEnabled();
+  await page.clock.install();
+  await page.clock.pauseAt(new Date());
+  for (let i = 0; i < 10; i++) {
+    await page.keyboard.press("ArrowRight");
+    await page.clock.runFor(50);
+  }
+  await expect(seek).toHaveValue("90");
+  expect(
+    await page.evaluate(
+      "window.__playerMock.calls.filter(c => c.command === 'seek')",
+    ),
+  ).toEqual([]);
+  await page.keyboard.press("ArrowLeft");
+  await expect(seek).toHaveValue("85");
+  await page.clock.runFor(199);
+  expect(
+    await page.evaluate(
+      "window.__playerMock.calls.filter(c => c.command === 'seek')",
+    ),
+  ).toEqual([]);
+  await page.clock.runFor(1);
+  expect(
+    await page.evaluate(
+      "window.__playerMock.calls.filter(c => c.command === 'seek').length",
+    ),
+  ).toBe(1);
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Escape");
+  await page.clock.runFor(500);
+  expect(
+    await page.evaluate(
+      "window.__playerMock.calls.filter(c => c.command === 'seek').length",
+    ),
+  ).toBe(1);
 });
 
 test("cached app, config, and lists survive an offline reload", async ({
