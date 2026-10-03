@@ -110,8 +110,11 @@ test("keyboard selection plays and returns to the same card; no management contr
   await expect(second).toHaveCSS("background-color", "rgb(29, 27, 32)");
   const unselected = page.getByRole("button", { name: /News story 1,/ });
   await expect(unselected).toHaveCSS("outline-style", "none");
+  await expect(unselected).toHaveCSS("border-top-width", "1px");
+  await expect(unselected).toHaveCSS("border-top-color", "rgb(73, 69, 79)");
   await expect(unselected).toHaveCSS("background-color", "rgb(20, 18, 24)");
   await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/#\/watch\/video000001$/);
   await expect(page.locator("iframe")).toHaveAttribute(
     "src",
     /embed\/video000001\?/,
@@ -145,6 +148,7 @@ test("keyboard selection plays and returns to the same card; no management contr
   await page.keyboard.press("ArrowRight");
   await expect(seek).toHaveValue("45");
   await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/#\/$/);
   await expect(second).toBeFocused();
   await expect(
     page.getByRole("button", { name: /settings|view all|sort/i }),
@@ -327,6 +331,21 @@ test("returning from playback preserves vertical and every row's horizontal scro
   });
   await page.keyboard.press("Enter");
   await expect(page.locator("iframe")).toBeVisible();
+  await expect(page).toHaveURL(/#\/watch\/video000006$/);
+  await page.goBack();
+  await expect(selected).toBeFocused();
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        top: window.scrollY,
+        tracks: [
+          ...document.querySelectorAll<HTMLElement>("[data-row-scroll]"),
+        ].map((track) => track.scrollLeft),
+      })),
+    )
+    .toEqual(before);
+  await page.goForward();
+  await expect(page.locator("iframe")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(selected).toBeFocused();
   await expect
@@ -339,6 +358,50 @@ test("returning from playback preserves vertical and every row's horizontal scro
       })),
     )
     .toEqual(before);
+});
+
+test("cached watch URL survives reload", async ({ page }) => {
+  await openHome(page);
+  await page.getByRole("button", { name: /News story 1,/ }).click();
+  await expect(page).toHaveURL(/#\/watch\/video000000$/);
+  await expect(page.locator("iframe")).toBeVisible();
+  await page.reload();
+  await expect(page.locator("iframe")).toBeVisible();
+  await expect(page).toHaveURL(/#\/watch\/video000000$/);
+  await page.getByRole("button", { name: "Back to home" }).click();
+  await expect(
+    page.getByRole("button", { name: /News story 1,/ }),
+  ).toBeFocused();
+});
+
+test("unavailable watch and unknown routes offer Home", async ({ page }) => {
+  await openHome(page);
+  await page.goto("./#/watch/missingvideo");
+  await expect(page.getByRole("status")).toHaveText(
+    "This video is not available in your saved library.",
+  );
+  await expect(page.locator("iframe")).toHaveCount(0);
+  await page.getByRole("link", { name: "Back to home" }).click();
+  await expect(
+    page.getByRole("button", { name: /News story 1,/ }),
+  ).toBeVisible();
+  await page.goto("./#/unknown");
+  await expect(page.getByText("Page not found.")).toBeVisible();
+  await page.getByRole("link", { name: "Back to home" }).click();
+  await expect(page).toHaveURL(/#\/$/);
+});
+
+test("new and legacy setup routes remain available", async ({ page }) => {
+  await openHome(page);
+  for (const hash of ["#/setup", "#setup"]) {
+    await page.goto(`./${hash}`);
+    await expect(page.getByRole("button", { name: /save/i })).toBeVisible();
+    await page.getByRole("button", { name: /save/i }).click();
+    await expect(page).toHaveURL(/#\/$/);
+    await expect(
+      page.getByRole("button", { name: /News story 1,/ }),
+    ).toBeVisible();
+  }
 });
 
 test("compact rows keep five cards visible and the selected ring inside the gutter", async ({

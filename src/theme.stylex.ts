@@ -7,6 +7,7 @@ export const theme = stylex.defineVars({
   surfaceContainerLow: "#1d1b20",
   onSurface: "#e6e0e9",
   onSurfaceVariant: "#cac4d0",
+  outlineVariant: "#49454f",
   focus: "#ffffff",
   gutter: { default: "48px", "@media (max-width: 900px)": "24px" },
   cardGap: { default: "24px", "@media (max-width: 900px)": "16px" },

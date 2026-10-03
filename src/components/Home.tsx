@@ -70,6 +70,7 @@ export function Home({
         .forEach((track) => {
           tracks[track.dataset.rowScroll!] = track.scrollLeft;
         });
+      playbackView.current = { top: window.scrollY, tracks };
       try {
         sessionStorage.setItem(
           "tv.view",
@@ -84,7 +85,11 @@ export function Home({
       }
     };
     window.addEventListener("pagehide", save);
-    return () => window.removeEventListener("pagehide", save);
+    window.addEventListener("scroll", save, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener("pagehide", save);
+      window.removeEventListener("scroll", save, true);
+    };
   }, [hidden]);
   useLayoutEffect(() => {
     const current = selectionRef.current;
@@ -124,7 +129,6 @@ export function Home({
               track.scrollLeft = view.tracks[track.dataset.rowScroll!] ?? 0;
             });
           window.scrollTo({ top: view.top });
-          playbackView.current = null;
         } else if (restorePending.current && saved) {
           document
             .querySelectorAll<HTMLElement>("[data-row-scroll]")
@@ -218,6 +222,17 @@ export function Home({
                   tracks[track.dataset.rowScroll!] = track.scrollLeft;
                 });
               playbackView.current = { top: window.scrollY, tracks };
+              try {
+                sessionStorage.setItem(
+                  "tv.view",
+                  JSON.stringify({
+                    ...playbackView.current,
+                    selection: selectionRef.current,
+                  }),
+                );
+              } catch {
+                /* View restoration is optional. */
+              }
               onPlay(video);
             }}
             onNearEnd={() => {

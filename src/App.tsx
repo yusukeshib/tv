@@ -1,11 +1,19 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import {
+  Link,
+  Route,
+  Routes,
+  useLocation,
+  useMatch,
+  useNavigate,
+} from "react-router-dom";
 import { Home } from "./components/Home";
 import { Player } from "./components/Player";
 import { Setup } from "./components/Setup";
 import { createStore } from "./store";
 import { SyncController } from "./sync";
 import { setPlaybackActive, startAppUpdates } from "./appUpdate";
-import type { DisplayRow, Video } from "./types";
+import type { DisplayRow } from "./types";
 
 function deviceStorage(): Storage {
   try {
@@ -36,9 +44,18 @@ export function App() {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const status = useSyncExternalStore(sync.subscribe, sync.getStatus);
   const [key, setKey] = useState(store.getKey);
-  const [setup, setSetup] = useState(location.hash === "#setup");
+  const navigate = useNavigate();
+  const location = useLocation();
+  const setup = location.pathname === "/setup";
+  const watch = useMatch("/watch/:videoId");
+  const video = Object.values(snapshot.rows)
+    .flatMap((row) => row.videos)
+    .find((candidate) => candidate.id === watch?.params.videoId);
   const [setupError, setSetupError] = useState<string>();
-  const [video, setVideo] = useState<Video>();
+  const closePlayer = () => {
+    if (location.state?.fromHome) navigate(-1);
+    else navigate("/", { replace: true });
+  };
 
   useEffect(() => {
     let disposed = false;
@@ -58,14 +75,6 @@ export function App() {
     return () => sync.stop();
   }, [key, setup]);
   useEffect(() => {
-    const changed = () => {
-      setSetup(location.hash === "#setup");
-      setVideo(undefined);
-    };
-    window.addEventListener("hashchange", changed);
-    return () => window.removeEventListener("hashchange", changed);
-  }, []);
-  useEffect(() => {
     setPlaybackActive(!!video);
   }, [video]);
 
@@ -74,10 +83,8 @@ export function App() {
       store.setKey(next);
       sync.resetKey();
       setKey(next.trim());
-      setSetup(false);
       setSetupError(undefined);
-      if (location.hash === "#setup")
-        history.replaceState(null, "", location.pathname + location.search);
+      if (setup) navigate("/", { replace: true });
     } catch (error) {
       setSetupError(
         error instanceof Error ? error.message : "Couldn’t save your key.",
@@ -96,15 +103,49 @@ export function App() {
     <>
       <Home
         rows={rows}
-        onPlay={setVideo}
+        onPlay={(next) =>
+          navigate(`/watch/${encodeURIComponent(next.id)}`, {
+            state: { fromHome: true },
+          })
+        }
         onLoadMore={(id) => {
           void sync.loadMore(id);
         }}
         loadingRows={status.loadingRows}
         notice={status.notice}
-        hidden={!!video}
+        hidden={location.pathname !== "/"}
       />
-      {video && <Player video={video} onClose={() => setVideo(undefined)} />}
+      <Routes>
+        <Route path="/" element={null} />
+        <Route
+          path="/watch/:videoId"
+          element={
+            video ? (
+              <Player video={video} onClose={closePlayer} />
+            ) : (
+              <main>
+                <p role="status">
+                  This video is not available in your saved library.
+                </p>
+                <Link to="/" replace>
+                  Back to home
+                </Link>
+              </main>
+            )
+          }
+        />
+        <Route
+          path="*"
+          element={
+            <main>
+              <p>Page not found.</p>
+              <Link to="/" replace>
+                Back to home
+              </Link>
+            </main>
+          }
+        />
+      </Routes>
     </>
   );
 }
