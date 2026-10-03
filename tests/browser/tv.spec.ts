@@ -17,7 +17,7 @@ const videos = Array.from({ length: 12 }, (_, i) => ({
     publishedAt: new Date(Date.now() - i * 3_600_000).toISOString(),
   },
 }));
-async function mockNetwork(page: Page) {
+async function mockNetwork(page: Page, homeConfig = config) {
   await page.route("https://www.youtube.com/iframe_api", (route) =>
     route.fulfill({
       contentType: "application/javascript",
@@ -27,7 +27,7 @@ async function mockNetwork(page: Page) {
   await page.route("https://raw.githubusercontent.com/**", (route) =>
     route.fulfill({
       headers: { "Access-Control-Allow-Origin": "*" },
-      json: config,
+      json: homeConfig,
     }),
   );
   await page.route("https://www.googleapis.com/**", (route) =>
@@ -50,8 +50,8 @@ async function mockNetwork(page: Page) {
     }),
   );
 }
-async function openHome(page: Page) {
-  await mockNetwork(page);
+async function openHome(page: Page, homeConfig = config) {
+  await mockNetwork(page, homeConfig);
   await page.addInitScript(() => {
     if (!localStorage.getItem("tv.youtube-key"))
       localStorage.setItem("tv.youtube-key", "test-browser-key");
@@ -294,6 +294,53 @@ test("app updates wait for playback to close, then reload exactly once", async (
   expect(navigations).toBe(1);
 });
 
+test("returning from playback preserves vertical and every row's horizontal scroll", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await openHome(page, {
+    version: 1,
+    rows: Array.from({ length: 4 }, (_, i) => ({
+      id: `row${i}`,
+      label: `Row ${i}`,
+      type: "search",
+      query: `row ${i}`,
+    })),
+  });
+  const selected = page
+    .locator('[data-row-scroll="row1"]')
+    .getByRole("button")
+    .nth(6);
+  await selected.evaluate((node) => node.focus({ preventScroll: true }));
+  const before = await page.evaluate(() => {
+    const tracks = [
+      ...document.querySelectorAll<HTMLElement>("[data-row-scroll]"),
+    ];
+    tracks.forEach((track, index) => {
+      track.scrollLeft = 350 + index * 100;
+    });
+    window.scrollTo(0, 300);
+    return {
+      top: window.scrollY,
+      tracks: tracks.map((track) => track.scrollLeft),
+    };
+  });
+  await page.keyboard.press("Enter");
+  await expect(page.locator("iframe")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(selected).toBeFocused();
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        top: window.scrollY,
+        tracks: [
+          ...document.querySelectorAll<HTMLElement>("[data-row-scroll]"),
+        ].map((track) => track.scrollLeft),
+      })),
+    )
+    .toEqual(before);
+});
+
 test("compact rows keep five cards visible and the selected ring inside the gutter", async ({
   page,
 }) => {
@@ -315,7 +362,7 @@ test("compact rows keep five cards visible and the selected ring inside the gutt
     expect(fifth.x + fifth.width + 8).toBeLessThanOrEqual(
       bounds.x + bounds.width + 1,
     );
-    await expect(cards.first()).toHaveCSS("outline-width", "4px");
+    await expect(cards.first()).toHaveCSS("outline-width", "6px");
     await expect(cards.first()).toHaveCSS(
       "outline-color",
       "rgb(255, 255, 255)",

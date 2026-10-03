@@ -52,6 +52,10 @@ export function Home({
     new Map<string, { signature: string; at: number }>(),
   );
   const wasHidden = useRef(hidden);
+  const playbackView = useRef<{
+    top: number;
+    tracks: Record<string, number>;
+  } | null>(null);
   const cardHadFocus = useRef(true);
   const anchor = useRef<{ x: number; y: number } | null>(null);
   const key = (row: string, video: string) => JSON.stringify([row, video]);
@@ -112,7 +116,16 @@ export function Home({
         (cardHadFocus.current || wasHidden.current || restorePending.current)
       ) {
         node.focus({ preventScroll: true });
-        if (restorePending.current && saved) {
+        if (wasHidden.current && playbackView.current) {
+          const view = playbackView.current;
+          home.current
+            ?.querySelectorAll<HTMLElement>("[data-row-scroll]")
+            .forEach((track) => {
+              track.scrollLeft = view.tracks[track.dataset.rowScroll!] ?? 0;
+            });
+          window.scrollTo({ top: view.top });
+          playbackView.current = null;
+        } else if (restorePending.current && saved) {
           document
             .querySelectorAll<HTMLElement>("[data-row-scroll]")
             .forEach((track) => {
@@ -130,6 +143,7 @@ export function Home({
       home.current?.focus();
     wasHidden.current = hidden;
     return () => {
+      if (hidden) return;
       const s = selectionRef.current;
       const node = s && buttons.current.get(key(s.row, s.video));
       if (node) {
@@ -196,7 +210,16 @@ export function Home({
                 index: row.videos.indexOf(video),
               });
             }}
-            onPlay={onPlay}
+            onPlay={(video) => {
+              const tracks: Record<string, number> = {};
+              home.current
+                ?.querySelectorAll<HTMLElement>("[data-row-scroll]")
+                .forEach((track) => {
+                  tracks[track.dataset.rowScroll!] = track.scrollLeft;
+                });
+              playbackView.current = { top: window.scrollY, tracks };
+              onPlay(video);
+            }}
             onNearEnd={() => {
               if (hidden || !row.hasMore || loadingRows.includes(row.id))
                 return;
