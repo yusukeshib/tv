@@ -25,7 +25,12 @@ function deviceStorage(): Storage {
 }
 const storage = deviceStorage();
 const store = createStore(storage);
-const sync = new SyncController(store, storage);
+const sync = new SyncController(
+  store,
+  storage,
+  undefined,
+  import.meta.env.DEV ? `${import.meta.env.BASE_URL}config.json` : undefined,
+);
 
 export function App() {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
@@ -87,20 +92,10 @@ export function App() {
     videos: snapshot.rows[row.id]?.videos || [],
     hasMore: !!snapshot.rows[row.id]?.nextPageToken,
   }));
-  if (snapshot.search)
-    rows.unshift({
-      id: "search",
-      label: snapshot.search.query,
-      videos: snapshot.search.result?.videos || [],
-      hasMore: !!snapshot.search.result?.nextPageToken,
-    });
   return (
     <>
       <Home
         rows={rows}
-        onSearch={(query) => {
-          void sync.search(query);
-        }}
         onPlay={setVideo}
         onLoadMore={(id) => {
           void sync.loadMore(id);

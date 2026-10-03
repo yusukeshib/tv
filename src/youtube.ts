@@ -152,18 +152,30 @@ export class YouTubeClient {
     row: RowDefinition,
     signal: AbortSignal,
     pageToken?: string,
+    publishedAfter?: string,
   ): Promise<VideoPage> {
     const pagination: Record<string, string> = pageToken ? { pageToken } : {};
     if (row.type === "search") {
+      const options = row.search;
+      const days = { "24h": 1, "7d": 7, "30d": 30, all: 0 }[options.timeRange];
+      const cutoff = days
+        ? (publishedAfter ??
+          new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString())
+        : undefined;
       const result = await this.get(
         "search",
         {
           part: "snippet",
           type: "video",
-          q: row.query,
-          order: "date",
+          q: options.query,
+          order: options.order,
           videoEmbeddable: "true",
-          maxResults: "25",
+          maxResults: String(options.maxResults),
+          ...(options.relevanceLanguage
+            ? { relevanceLanguage: options.relevanceLanguage }
+            : {}),
+          ...(options.regionCode ? { regionCode: options.regionCode } : {}),
+          ...(cutoff ? { publishedAfter: cutoff } : {}),
           ...pagination,
         },
         signal,
@@ -175,6 +187,7 @@ export class YouTubeClient {
             .filter((video): video is Video => !!video),
         ),
         nextPageToken: result.nextPageToken,
+        ...(cutoff ? { publishedAfter: cutoff } : {}),
       };
     }
     let playlistId = this.uploads.get(row.channelId);

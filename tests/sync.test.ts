@@ -99,7 +99,7 @@ describe("background synchronization", () => {
       version: 1,
       rows: [
         { ...row, label: "Renamed" },
-        { ...row, id: "second", query: "other" },
+        { ...row, id: "second", search: { ...row.search, query: "other" } },
       ],
     };
     const { store, controller } = setup(saved, (url) =>
@@ -152,39 +152,40 @@ describe("background synchronization", () => {
     expect(request).toHaveBeenCalledOnce();
   });
 
-  it("ignores late results from a superseded search even when the fetch mock ignores abort", async () => {
-    const first = deferred<Response>();
-    const { controller, store } = setup(snapshot(), (url) =>
-      url.searchParams.get("q") === "first"
-        ? first.promise
-        : json({ items: [item("bbbbbbbbbbb")] }),
+  it("ignores late pagination results after the row's search settings change", async () => {
+    const response = deferred<Response>();
+    const { controller, store } = setup(
+      snapshot(cached(Date.now(), { nextPageToken: "page2" })),
+      () => response.promise,
     );
-    const pending = controller.search("first");
-    await controller.search("second");
-    first.resolve(json({ items: [item()] }));
+    const pending = controller.loadMore("news");
+    store.save({
+      version: 1,
+      config: {
+        version: 1,
+        rows: [{ ...row, search: { ...row.search, order: "viewCount" } }],
+      },
+      rows: {},
+    });
+    response.resolve(json({ items: [item()] }));
     await pending;
-    expect(store.getSnapshot().search?.query).toBe("second");
-    expect(store.getSnapshot().search?.result?.videos.map((v) => v.id)).toEqual(
-      ["bbbbbbbbbbb"],
-    );
+    expect(store.getSnapshot().rows.news).toBeUndefined();
     expect(controller.getStatus().loadingRows).toEqual([]);
   });
 
-  it("does not accept late search results after stop and skips ticks while hidden", async () => {
+  it("does not accept late video results after stop and skips ticks while hidden", async () => {
     const response = deferred<Response>();
-    const { controller, store, request } = setup(
-      snapshot(),
-      () => response.promise,
-    );
+    const saved = snapshot(cached(Date.now(), { nextPageToken: "page2" }));
+    const { controller, store, request } = setup(saved, () => response.promise);
     documentStub.hidden = true;
     await controller.tick();
     expect(request).not.toHaveBeenCalled();
     documentStub.hidden = false;
-    const pending = controller.search("query");
+    const pending = controller.loadMore("news");
     controller.stop();
-    response.resolve(json({ items: [item()] }));
+    response.resolve(json({ items: [item("bbbbbbbbbbb")] }));
     await pending;
-    expect(store.getSnapshot().search).toEqual({ query: "query" });
+    expect(store.getSnapshot()).toEqual(saved);
     expect(controller.getStatus().loadingRows).toEqual([]);
   });
 });

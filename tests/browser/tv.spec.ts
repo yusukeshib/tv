@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { playerAPIMock } from "./playerMock";
 
 const config = {
   version: 1,
@@ -15,6 +16,12 @@ const videos = Array.from({ length: 12 }, (_, i) => ({
   },
 }));
 async function mockNetwork(page: Page) {
+  await page.route("https://www.youtube.com/iframe_api", (route) =>
+    route.fulfill({
+      contentType: "application/javascript",
+      body: playerAPIMock,
+    }),
+  );
   await page.route("https://raw.githubusercontent.com/**", (route) =>
     route.fulfill({
       headers: { "Access-Control-Allow-Origin": "*" },
@@ -89,9 +96,8 @@ test("keyboard selection plays and returns to the same card; no management contr
   page,
 }) => {
   await openHome(page);
-  const search = page.getByRole("textbox", { name: "Search YouTube videos" });
-  await search.focus();
-  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("search")).toHaveCount(0);
+  await page.getByRole("button", { name: /News story 1,/ }).focus();
   await page.keyboard.press("ArrowRight");
   const second = page.getByRole("button", { name: /News story 2,/ });
   await expect(second).toBeFocused();
@@ -100,7 +106,32 @@ test("keyboard selection plays and returns to the same card; no management contr
     "src",
     /embed\/video000001\?/,
   );
-  await page.getByRole("button", { name: "Back to home" }).click();
+  const seek = page.getByRole("slider", { name: "Seek" });
+  await expect(seek).toBeEnabled();
+  await expect(
+    page.getByRole("button", {
+      name: /fullscreen|mute|rewind|forward|pause|^play$/i,
+    }),
+  ).toHaveCount(0);
+  expect(await page.evaluate("window.__playerMock.vars.controls")).toBe(0);
+  expect(await page.evaluate("window.__playerMock.vars.fs")).toBe(0);
+  await page.keyboard.press("ArrowRight");
+  await expect(seek).toHaveValue("45");
+  await page.keyboard.press("ArrowLeft");
+  await expect(seek).toHaveValue("40");
+  await page.keyboard.press("Space");
+  expect(await page.evaluate("window.__playerMock.calls.at(-1).command")).toBe(
+    "pause",
+  );
+  await page.keyboard.press("Space");
+  expect(await page.evaluate("window.__playerMock.calls.at(-1).command")).toBe(
+    "play",
+  );
+  await page.frameLocator("iframe").locator("body").click();
+  await expect(page.getByRole("dialog")).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(seek).toHaveValue("45");
+  await page.keyboard.press("Escape");
   await expect(second).toBeFocused();
   await expect(
     page.getByRole("button", { name: /settings|view all|sort/i }),
@@ -205,4 +236,44 @@ test("app updates wait for playback to close, then reload exactly once", async (
   await page.getByRole("button", { name: "Back to home" }).click();
   await expect(page).toHaveTitle("TV updated");
   expect(navigations).toBe(1);
+});
+
+test("compact rows keep five cards visible and the selected ring inside the gutter", async ({
+  page,
+}) => {
+  await openHome(page);
+  await expect(page.getByText("TV YouTube", { exact: true })).toHaveCount(0);
+  for (const width of [1920, 1786, 1280]) {
+    await page.setViewportSize({ width, height: 1080 });
+    const track = page.locator('[data-row-scroll="news"]');
+    const cards = track.getByRole("button");
+    await cards.first().focus();
+    const heading = await page
+      .getByRole("heading", { name: "Japan news" })
+      .boundingBox();
+    const first = (await cards.nth(0).boundingBox())!;
+    const fifth = (await cards.nth(4).boundingBox())!;
+    const bounds = (await track.boundingBox())!;
+    expect(Math.abs(first.x - heading!.x)).toBeLessThan(2);
+    expect(first.x - 8).toBeGreaterThanOrEqual(bounds.x);
+    expect(fifth.x + fifth.width + 8).toBeLessThanOrEqual(
+      bounds.x + bounds.width + 1,
+    );
+    await expect(cards.first()).toHaveCSS("outline-width", "4px");
+    await expect(cards.first()).toHaveCSS(
+      "outline-color",
+      "rgb(255, 255, 255)",
+    );
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight");
+    await cards.first().focus();
+    const restored = (await cards.first().boundingBox())!;
+    expect(Math.abs(restored.x - heading!.x)).toBeLessThan(2);
+  }
+  await page.setViewportSize({ width: 1786, height: 1080 });
+  await page.screenshot({ path: "test-results/compact-home.png" });
 });

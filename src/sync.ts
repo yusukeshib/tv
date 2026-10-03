@@ -7,7 +7,6 @@ export const VIDEO_INTERVAL = 10 * 60_000;
 export const CONFIG_URL =
   "https://raw.githubusercontent.com/yusukeshib/tv/main/public/config.json";
 const BACKOFF_KEY = "tv.backoff.v1";
-const SEARCH_ID = "search";
 export interface SyncStatus {
   loadingRows: readonly string[];
   notice?: string;
@@ -113,33 +112,15 @@ export class SyncController {
   };
   private currentDefinition(id: string): RowDefinition | undefined {
     const snapshot = this.store.getSnapshot();
-    if (id === SEARCH_ID)
-      return snapshot.search
-        ? {
-            id,
-            type: "search",
-            label: snapshot.search.query,
-            query: snapshot.search.query,
-          }
-        : undefined;
     return snapshot.config.rows.find((row) => row.id === id);
   }
   private cached(id: string): CachedRow | undefined {
     const snapshot = this.store.getSnapshot();
-    return id === SEARCH_ID ? snapshot.search?.result : snapshot.rows[id];
+    return snapshot.rows[id];
   }
   private saveResult(id: string, result: CachedRow) {
     const snapshot = this.store.getSnapshot();
-    this.store.save(
-      id === SEARCH_ID
-        ? {
-            ...snapshot,
-            search: snapshot.search
-              ? { ...snapshot.search, result }
-              : undefined,
-          }
-        : { ...snapshot, rows: { ...snapshot.rows, [id]: result } },
-    );
+    this.store.save({ ...snapshot, rows: { ...snapshot.rows, [id]: result } });
   }
   resetKey() {
     this.abort();
@@ -163,8 +144,6 @@ export class SyncController {
       if (this.stopped || document.hidden) return;
       const snapshot = this.store.getSnapshot();
       const definitions = [...snapshot.config.rows];
-      const search = this.currentDefinition(SEARCH_ID);
-      if (search) definitions.unshift(search);
       for (const row of definitions) {
         if (this.stopped || document.hidden) return;
         const cached = this.cached(row.id);
@@ -261,6 +240,7 @@ export class SyncController {
         row,
         signal,
         more ? existing?.nextPageToken : undefined,
+        more ? existing?.publishedAfter : undefined,
       );
       const latest = this.currentDefinition(row.id);
       if (
@@ -277,6 +257,7 @@ export class SyncController {
           more ? [...(existing?.videos || []), ...page.videos] : page.videos,
         ),
         nextPageToken: page.nextPageToken,
+        publishedAfter: page.publishedAfter,
         updatedAt: more ? existing!.updatedAt : Date.now(),
       });
       this.errors.delete(row.id);
@@ -306,28 +287,6 @@ export class SyncController {
     }
   }
 
-  async search(query: string) {
-    query = query.trim().slice(0, 500);
-    this.requests.get(SEARCH_ID)?.abort();
-    this.requests.delete(SEARCH_ID);
-    this.errors.delete(SEARCH_ID);
-    try {
-      const snapshot = this.store.getSnapshot();
-      if (!query) {
-        this.store.save({ ...snapshot, search: undefined });
-        this.publish();
-        return;
-      }
-      this.store.save({
-        ...snapshot,
-        search: snapshot.search?.query === query ? snapshot.search : { query },
-      });
-      const row = this.currentDefinition(SEARCH_ID)!;
-      await this.refreshRow(row);
-    } catch (error) {
-      this.report("storage", error);
-    }
-  }
   async loadMore(id: string) {
     const row = this.currentDefinition(id);
     if (row) await this.refreshRow(row, true);

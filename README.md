@@ -4,7 +4,7 @@ A small, offline-first YouTube interface for a Mac connected to a TV. React, Typ
 
 **Open:** https://yusukeshib.github.io/tv/
 
-The home screen is just search and horizontal video rows. Each row is a saved search or a favorite channel, always newest first. Scroll sideways for more; no categories, sorting menus, or “view all” screens.
+The home screen contains only horizontal video rows defined in config.json. There is no search box or local preset editor. Search conditions select the candidate videos; the retrieved candidates are displayed newest first. Scroll sideways for more; no categories, sorting menus, or “view all” screens.
 
 ## First run
 
@@ -29,7 +29,14 @@ Edit [`public/config.json`](public/config.json), then commit and push to `main`:
       "id": "japan-news",
       "label": "Japan news",
       "type": "search",
-      "query": "日本 ニュース"
+      "search": {
+        "query": "Japan news",
+        "order": "viewCount",
+        "timeRange": "7d",
+        "relevanceLanguage": "en",
+        "regionCode": "US",
+        "maxResults": 25
+      }
     },
     {
       "id": "favorite-channel",
@@ -41,31 +48,43 @@ Edit [`public/config.json`](public/config.json), then commit and push to `main`:
 }
 ```
 
-Replace the example channel ID with a real channel ID (`UC` followed by 22 characters), not an `@handle`. Keep row IDs stable and unique. `search` is reserved for the temporary search row. Reorder the array to reorder the home screen. An empty array is valid. Search queries can use any language; the interface is English.
+Replace the example channel ID with a real channel ID (`UC` followed by 22 characters), not an `@handle`. Keep row IDs stable and unique. Reorder the array to reorder the home screen. An empty array is valid. Search queries can use any language; the interface is English.
 
-The browser reads the **raw GitHub file**, not the cached Pages app, every minute while visible. GitHub/CDN delays can still affect freshness. Invalid config leaves the previous valid config in place. New or changed rows load immediately; changing only labels or order reuses saved videos.
+Each search row has its own retrieval settings:
+
+- `query`: search text.
+- `order`: `relevance`, `viewCount`, `rating`, or `date`. This selects candidates; it is **not** the display sort. `viewCount` means total view count, not YouTube Trending.
+- `timeRange`: `24h`, `7d`, `30d`, or `all`. Relative windows become a UTC `publishedAfter` cutoff, held fixed while paging through those results.
+- `relevanceLanguage`: optional language preference, for example `en`. YouTube may still return other languages.
+- `regionCode`: optional two-letter country code, for example `US`, for regional availability.
+- `maxResults`: 1–50 candidates per API page.
+
+The bundled config uses five specific channels (BBC News, Reuters, Marques Brownlee, Veritasium, and NASA) rather than broad keyword searches. The search example above retrieves the most-viewed candidates published in the past seven days, then displays those candidates newest first. This does not guarantee editorial quality or represent every video published in that time range. Loading additional pages fetches more candidates using the same settings and re-sorts the retrieved set by publication time.
+
+Changing any retrieval setting invalidates that row’s cached results and pagination tokens. Config is the only source of presets; old ad-hoc search data is removed from local storage.
+
+The deployed browser reads the **raw GitHub file**, not the cached Pages app, every minute while visible. The development server reads the local `public/config.json` instead, so unpushed edits can be previewed. GitHub/CDN delays can still affect freshness. Invalid config leaves the previous valid config in place. New or changed rows load immediately; changing only labels or order reuses saved videos.
 
 This is a manually maintained channel list, not a sync of your signed-in YouTube subscriptions or personalized recommendations. No Google sign-in is required by this app. The official player may separately ask you to sign in for some content.
 
 ## Controls
 
-- **Up / Down:** change rows; Up from the first row reaches search.
-- **Left / Right:** select a video.
-- **Enter:** play, or submit a search.
-- **Escape:** return home when the app has keyboard focus.
-- **Back to home:** visible outside the player. A cross-origin YouTube iframe captures its own keys; Escape cannot always reach the app. Use the pointer or tab out of the player to the back button.
-- Submit an empty search to remove the temporary search row.
+- **Home:** Up / Down changes rows, Left / Right selects videos, Enter plays.
+- **Player:** Left / Right seeks by 5 seconds; Space toggles playback; Escape returns home.
+- A seek bar supports pointer input; Back to home remains available outside the player.
+
+The official IFrame Player API handles playback. YouTube’s standard control bar is disabled; there are no fullscreen, mute, or transport-button toolbars. Chrome is already used fullscreen. The app retains keyboard focus after interaction with the iframe without placing a click-blocking overlay over it. It does not steal focus from another browser tab or application.
 
 Mouse/trackpad input also works. A dedicated phone remote, HDMI-CEC control, and guaranteed remote-only control inside YouTube’s player are not included.
 
 ## Refresh and quotas
 
 - **Config:** every minute while the page is visible.
-- **Video rows:** every 10 minutes while visible. New searches and additional pages are separate requests.
+- **Video rows:** every 10 minutes while visible. Changed search settings and additional pages are separate requests.
 - **App:** check for an updated service worker every minute. Download the complete new HTML/JS/CSS before activating it. If a video is open, wait until returning home, then reload once.
 - **Resume:** check config and refresh overdue rows when the page becomes visible or connectivity returns.
 
-As documented by YouTube, the standard project allowance is **100 `search.list` calls/day**, with a separate **10,000-unit/day** bucket for most other endpoints. Check your actual project quotas; they may differ. One search row used for six hours at a 10-minute interval needs about 36 calls; two need about 72, **plus startup, manual searches, config changes, and pagination**. Usage is shared across devices using the same project. Channel rows use the uploads playlist rather than the search endpoint.
+As documented by YouTube, the standard project allowance is **100 `search.list` calls/day**, with a separate **10,000-unit/day** bucket for most other endpoints. Check your actual project quotas; they may differ. One search row used for six hours at a 10-minute interval needs about 36 calls; two need about 72, **plus startup, config changes, and pagination**. Usage is shared across devices using the same project. Channel rows use the uploads playlist rather than the search endpoint.
 
 On daily quota exhaustion, requests in the affected group pause until the next Pacific-time midnight. Rate limits respect a cooldown. Auth errors stop further YouTube calls until the key is saved again. Config and app updates continue independently.
 
@@ -101,7 +120,7 @@ bun run format:check
 
 Use `bun run test`, not Bun’s native `bun test`: these tests use Vitest mocks/timers. Service workers are enabled in production builds, not the dev server. `bun run preview` serves the built app locally. `tests/server.mjs` is only a local test harness, not a deployed backend; its version switches exercise successful and failed HTML-only updates.
 
-UI styles use StyleX compiled at build time. No component framework or runtime CSS-in-JS engine is needed.
+UI styles use StyleX compiled at build time. The list uses Material 3 dark surface/type roles and the Android TV focus guidance, implemented with a small shared value file (`src/theme.stylex.ts`), not a component framework or theme engine. Desktop gutters are 48px, card gaps 24px, and card text insets 16px. Only the selected card has a white focus ring; no hover decoration or animation is added. References: [Material typography](https://github.com/material-components/material-web/blob/main/docs/theming/typography.md), [TV focus](https://developer.android.com/design/ui/tv/guides/styles/focus-system).
 
 ## Deployment
 

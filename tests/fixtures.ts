@@ -1,11 +1,17 @@
 import { vi } from "vitest";
-import type { CachedRow, RowDefinition, Snapshot, Video } from "../src/types";
+import type { CachedRow, Snapshot, Video } from "../src/types";
+import { definitionKey } from "../src/store";
 
-export const row: RowDefinition = {
+export const row = {
   id: "news",
   label: "News",
-  type: "search",
-  query: "news",
+  type: "search" as const,
+  search: {
+    query: "news",
+    order: "relevance" as const,
+    timeRange: "all" as const,
+    maxResults: 25,
+  },
 };
 export const video = (
   id = "aaaaaaaaaaa",
@@ -21,7 +27,7 @@ export const cached = (
   updatedAt = Date.now(),
   overrides: Partial<CachedRow> = {},
 ): CachedRow => ({
-  definitionKey: "search:news",
+  definitionKey: definitionKey(row),
   videos: [video()],
   updatedAt,
   ...overrides,

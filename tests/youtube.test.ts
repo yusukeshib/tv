@@ -4,7 +4,7 @@ import { item, json, row, video } from "./fixtures";
 
 const signal = () => new AbortController().signal;
 describe("YouTube requests", () => {
-  it("requests embeddable videos in latest order and forwards pagination", async () => {
+  it("requests embeddable candidates with configured ranking and forwards pagination", async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(
       json({
         items: [
@@ -25,7 +25,8 @@ describe("YouTube requests", () => {
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
       key: "secret",
       q: "news",
-      order: "date",
+      order: "relevance",
+      maxResults: "25",
       type: "video",
       videoEmbeddable: "true",
       pageToken: "page2",
@@ -35,6 +36,62 @@ describe("YouTube requests", () => {
       "bbbbbbbbbbb",
     ]);
     expect(result.nextPageToken).toBe("next");
+  });
+
+  it("forwards options and freezes relative cutoffs across pagination", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () =>
+        json({ items: [], nextPageToken: "next" }),
+      );
+    const client = new YouTubeClient(() => "key", request);
+    const now = vi
+      .spyOn(Date, "now")
+      .mockReturnValue(Date.parse("2026-02-10T12:00:00Z"));
+    try {
+      for (const [timeRange, days] of [
+        ["24h", 1],
+        ["7d", 7],
+        ["30d", 30],
+      ] as const) {
+        const configured = {
+          ...row,
+          search: {
+            ...row.search,
+            order: "viewCount" as const,
+            timeRange,
+            relevanceLanguage: "en",
+            regionCode: "US",
+            maxResults: 50,
+          },
+        };
+        const first = await client.page(configured, signal());
+        expect(first.publishedAfter).toBe(
+          new Date(Date.now() - days * 86400000).toISOString(),
+        );
+        now.mockReturnValue(Date.now() + 3600000);
+        await client.page(configured, signal(), "next", first.publishedAfter);
+        const params = new URL(String(request.mock.calls.at(-1)![0]))
+          .searchParams;
+        expect(Object.fromEntries(params)).toMatchObject({
+          order: "viewCount",
+          relevanceLanguage: "en",
+          regionCode: "US",
+          maxResults: "50",
+          pageToken: "next",
+          publishedAfter: first.publishedAfter,
+        });
+      }
+      const all = await client.page(row, signal());
+      expect(all.publishedAfter).toBeUndefined();
+      expect(
+        new URL(String(request.mock.calls.at(-1)![0])).searchParams.has(
+          "publishedAfter",
+        ),
+      ).toBe(false);
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it("deduplicates IDs and resolves equal publication times deterministically", () => {

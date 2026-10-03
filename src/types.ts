@@ -1,5 +1,14 @@
+export interface SearchOptions {
+  query: string;
+  order: "relevance" | "viewCount" | "rating" | "date";
+  timeRange: "24h" | "7d" | "30d" | "all";
+  relevanceLanguage?: string;
+  regionCode?: string;
+  maxResults: number;
+}
+
 export type RowDefinition =
-  | { id: string; label: string; type: "search"; query: string }
+  | { id: string; label: string; type: "search"; search: SearchOptions }
   | { id: string; label: string; type: "channel"; channelId: string };
 
 export interface Config {
@@ -18,6 +27,7 @@ export interface Video {
 export interface VideoPage {
   videos: Video[];
   nextPageToken?: string;
+  publishedAfter?: string;
 }
 
 export interface CachedRow extends VideoPage {
@@ -29,7 +39,6 @@ export interface Snapshot {
   version: 1;
   config: Config;
   rows: Record<string, CachedRow>;
-  search?: { query: string; result?: CachedRow };
 }
 
 export interface DisplayRow {
@@ -41,7 +50,6 @@ export interface DisplayRow {
 
 export interface HomeProps {
   rows: DisplayRow[];
-  onSearch: (query: string) => void;
   onPlay: (video: Video) => void;
   onLoadMore: (rowId: string) => void;
   loadingRows: readonly string[];

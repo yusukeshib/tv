@@ -8,6 +8,7 @@ import {
 import * as stylex from "@stylexjs/stylex";
 import type { HomeProps } from "../types";
 import { VideoRow } from "./VideoRow";
+import { theme } from "../theme.stylex";
 
 type Selection = { row: string; video: string; index: number };
 type View = {
@@ -34,26 +35,24 @@ function savedView(): View | null {
 }
 export function Home({
   rows,
-  onSearch,
   onPlay,
   onLoadMore,
   loadingRows,
   notice,
   hidden = false,
 }: HomeProps) {
-  const [query, setQuery] = useState("");
   const [saved] = useState(savedView);
   const restorePending = useRef(!!saved);
   const [selected, setSelected] = useState<Selection | null>(
     saved?.selection ?? null,
   );
   const buttons = useRef(new Map<string, HTMLButtonElement>());
-  const search = useRef<HTMLInputElement>(null);
+  const home = useRef<HTMLElement>(null);
   const requested = useRef(
     new Map<string, { signature: string; at: number }>(),
   );
   const wasHidden = useRef(hidden);
-  const cardHadFocus = useRef(!!saved);
+  const cardHadFocus = useRef(true);
   const anchor = useRef<{ x: number; y: number } | null>(null);
   const key = (row: string, video: string) => JSON.stringify([row, video]);
   const selectionRef = useRef(selected);
@@ -128,7 +127,7 @@ export function Home({
         } else node.scrollIntoView({ block: "nearest", inline: "nearest" });
       }
     } else if (!hidden && (cardHadFocus.current || wasHidden.current))
-      search.current?.focus();
+      home.current?.focus();
     wasHidden.current = hidden;
     return () => {
       const s = selectionRef.current;
@@ -149,19 +148,6 @@ export function Home({
     node?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
   function navigate(event: KeyboardEvent) {
-    if (event.target instanceof HTMLInputElement) {
-      if (event.key === "ArrowDown" || event.key === "Escape") {
-        event.preventDefault();
-        focus(
-          Math.max(
-            0,
-            rows.findIndex((r) => r.id === selected?.row),
-          ),
-          selected?.index ?? 0,
-        );
-      }
-      return;
-    }
     if (!selected) return;
     const rowIndex = rows.findIndex((r) => r.id === selected.row);
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
@@ -174,61 +160,17 @@ export function Home({
       let next = rowIndex + direction;
       while (next >= 0 && next < rows.length && !rows[next].videos.length)
         next += direction;
-      if (next < 0) search.current?.focus();
-      else if (next < rows.length) focus(next, selected.index);
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      search.current?.focus();
+      if (next >= 0 && next < rows.length) focus(next, selected.index);
     }
   }
   return (
-    <main hidden={hidden} {...stylex.props(styles.home)} onKeyDown={navigate}>
-      <header {...stylex.props(styles.header)}>
-        <div {...stylex.props(styles.wordmark)}>
-          TV <span {...stylex.props(styles.tv)}>YouTube</span>
-        </div>
-        <form
-          {...stylex.props(styles.form)}
-          role="search"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSearch(query.trim());
-          }}
-        >
-          <svg
-            width="26"
-            height="26"
-            viewBox="0 0 24 24"
-            fill="none"
-            aria-hidden="true"
-          >
-            <circle
-              cx="10.5"
-              cy="10.5"
-              r="6.5"
-              stroke="currentColor"
-              strokeWidth="1.8"
-            />
-            <path d="m16 16 5 5" stroke="currentColor" strokeWidth="1.8" />
-          </svg>
-          <input
-            ref={search}
-            autoFocus
-            {...stylex.props(styles.input)}
-            aria-label="Search YouTube videos"
-            placeholder="Search videos"
-            value={query}
-            onFocus={() => {
-              cardHadFocus.current = false;
-            }}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <button {...stylex.props(styles.submit)} type="submit">
-            Search
-          </button>
-        </form>
-      </header>
+    <main
+      ref={home}
+      tabIndex={-1}
+      hidden={hidden}
+      {...stylex.props(styles.home)}
+      onKeyDown={navigate}
+    >
       {notice && (
         <p {...stylex.props(styles.notice)} role="status">
           {notice}
@@ -273,7 +215,7 @@ export function Home({
       </div>
       {!rows.length && (
         <p {...stylex.props(styles.notice)}>
-          Search for videos or add a row in config.json.
+          Add a row in config.json to get started.
         </p>
       )}
     </main>
@@ -282,69 +224,17 @@ export function Home({
 const styles = stylex.create({
   home: {
     minHeight: "100vh",
-    backgroundColor: "#101014",
-    color: "#f5f5f7",
-    paddingBottom: 40,
-    fontFamily: 'Inter, "Noto Sans JP", system-ui, sans-serif',
-  },
-  header: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 32,
-    paddingInline: "clamp(24px, 4vw, 80px)",
-    paddingBlock: "clamp(28px, 3.5vw, 64px)",
-  },
-  wordmark: {
-    fontSize: "clamp(25px, 2vw, 38px)",
-    fontWeight: 750,
-    letterSpacing: "-0.04em",
-  },
-  tv: { color: "#a7a7b2", fontWeight: 400, marginLeft: 6 },
-  form: {
-    display: "flex",
-    alignItems: "center",
-    gap: 16,
-    backgroundColor: "#202027",
-    borderRadius: 12,
-    padding: 12,
-    paddingLeft: 22,
-    flexGrow: 1,
-    maxWidth: 900,
-    border: {
-      default: "2px solid transparent",
-      ":focus-within": "2px solid #d9d9e2",
-    },
-    color: "#a7a7b2",
-  },
-  input: {
-    width: "100%",
-    minWidth: 0,
-    border: 0,
+    backgroundColor: theme.surface,
+    color: theme.onSurface,
+    paddingBlock: theme.pageInset,
     outline: "none",
-    backgroundColor: "transparent",
-    color: "#fff",
-    fontSize: "clamp(20px, 1.5vw, 28px)",
-    lineHeight: 1.6,
-  },
-  submit: {
-    backgroundColor: "#35353e",
-    color: "#fff",
-    border: 0,
-    borderRadius: 7,
-    paddingBlock: 10,
-    paddingInline: 20,
-    whiteSpace: "nowrap",
-    fontSize: 18,
-    cursor: "pointer",
-    outline: { default: "none", ":focus-visible": "2px solid #fff" },
   },
   notice: {
-    color: "#bbbcc7",
-    fontSize: "clamp(17px, 1.3vw, 24px)",
-    paddingInline: "clamp(24px, 4vw, 80px)",
+    color: theme.onSurfaceVariant,
+    fontSize: theme.titleMedium,
+    paddingInline: theme.gutter,
     marginTop: 0,
-    marginBottom: 30,
-    lineHeight: 1.6,
+    marginBottom: theme.sectionGap,
+    lineHeight: theme.titleMediumLine,
   },
 });

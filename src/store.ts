@@ -3,6 +3,7 @@ import type {
   Config,
   RowDefinition,
   Snapshot,
+  SearchOptions,
   Video,
 } from "./types";
 
@@ -36,13 +37,52 @@ export function parseConfig(value: unknown): Config {
     if (!object(row) || !safeId(row.id) || ids.has(row.id) || !text(row.label))
       throw new Error("Each row needs a unique ID and a label.");
     ids.add(row.id);
-    if (row.type === "search" && text(row.query))
-      return {
-        id: row.id,
-        label: row.label,
-        type: "search",
-        query: row.query.trim(),
+    if (row.type === "search") {
+      const options =
+        row.search === undefined && text(row.query)
+          ? {
+              query: row.query,
+              order: "relevance",
+              timeRange: "all",
+              maxResults: 25,
+            }
+          : row.search;
+      if (
+        !object(options) ||
+        !text(options.query) ||
+        typeof options.order !== "string" ||
+        !["relevance", "viewCount", "rating", "date"].includes(options.order) ||
+        typeof options.timeRange !== "string" ||
+        !["24h", "7d", "30d", "all"].includes(options.timeRange) ||
+        !Number.isInteger(options.maxResults) ||
+        (options.maxResults as number) < 1 ||
+        (options.maxResults as number) > 50 ||
+        (options.relevanceLanguage !== undefined &&
+          (typeof options.relevanceLanguage !== "string" ||
+            !/^[a-zA-Z]{2,3}(?:-[a-zA-Z]{2,4})?$/.test(
+              options.relevanceLanguage.trim(),
+            ))) ||
+        (options.regionCode !== undefined &&
+          (typeof options.regionCode !== "string" ||
+            !/^[a-zA-Z]{2}$/.test(options.regionCode.trim())))
+      )
+        throw new Error("Check the search options in config.json.");
+      const search: SearchOptions = {
+        query: options.query.trim(),
+        order: options.order as SearchOptions["order"],
+        timeRange: options.timeRange as SearchOptions["timeRange"],
+        maxResults: options.maxResults as number,
+        ...(typeof options.relevanceLanguage === "string"
+          ? {
+              relevanceLanguage: options.relevanceLanguage.trim().toLowerCase(),
+            }
+          : {}),
+        ...(typeof options.regionCode === "string"
+          ? { regionCode: options.regionCode.trim().toUpperCase() }
+          : {}),
       };
+      return { id: row.id, label: row.label, type: "search", search };
+    }
     if (
       row.type === "channel" &&
       typeof row.channelId === "string" &&
@@ -60,7 +100,9 @@ export function parseConfig(value: unknown): Config {
 }
 
 export const definitionKey = (row: RowDefinition): string =>
-  row.type === "search" ? `search:${row.query}` : `channel:${row.channelId}`;
+  row.type === "search"
+    ? `search:${JSON.stringify([row.search.query, row.search.order, row.search.timeRange, row.search.relevanceLanguage ?? null, row.search.regionCode ?? null, row.search.maxResults])}`
+    : `channel:${row.channelId}`;
 export const isVideo = (v: unknown): v is Video =>
   object(v) &&
   typeof v.id === "string" &&
@@ -92,6 +134,10 @@ function readRow(
     definitionKey: key,
     videos: value.videos,
     updatedAt: value.updatedAt,
+    ...(typeof value.publishedAfter === "string" &&
+    Number.isFinite(Date.parse(value.publishedAfter))
+      ? { publishedAfter: value.publishedAfter }
+      : {}),
     ...(typeof value.nextPageToken === "string"
       ? { nextPageToken: value.nextPageToken }
       : {}),
@@ -112,14 +158,8 @@ export function readSnapshot(
         const cached = readRow(raw.rows[row.id], definitionKey(row), now);
         if (cached) rows[row.id] = cached;
       }
-    let search: Snapshot["search"];
-    if (object(raw.search) && text(raw.search.query)) {
-      search = {
-        query: raw.search.query,
-        result: readRow(raw.search.result, `search:${raw.search.query}`, now),
-      };
-    }
-    return { version: 1, config, rows, ...(search ? { search } : {}) };
+    // Discard legacy ad-hoc searches; only config-defined rows belong in the cache.
+    return { version: 1, config, rows };
   } catch {
     return emptySnapshot();
   }
@@ -183,16 +223,8 @@ export function createStore(storage: Storage) {
           ([, row]) => now - row.updatedAt < RETENTION_MS,
         ),
       );
-      const search =
-        snapshot.search?.result &&
-        now - snapshot.search.result.updatedAt >= RETENTION_MS
-          ? { query: snapshot.search.query }
-          : snapshot.search;
-      if (
-        Object.keys(rows).length !== Object.keys(snapshot.rows).length ||
-        search !== snapshot.search
-      )
-        this.save({ ...snapshot, rows, search });
+      if (Object.keys(rows).length !== Object.keys(snapshot.rows).length)
+        this.save({ ...snapshot, rows });
     },
   };
 }

@@ -1,5 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import type { Video } from "../types";
+import { theme } from "../theme.stylex";
 
 interface Props {
   video: Video;
@@ -19,7 +20,7 @@ export function VideoCard({
   return (
     <button
       ref={buttonRef}
-      {...stylex.props(styles.card)}
+      {...stylex.props(styles.card, active && styles.active)}
       tabIndex={active ? 0 : -1}
       onFocus={onFocus}
       onClick={onPlay}
@@ -34,40 +35,48 @@ export function VideoCard({
           crossOrigin="anonymous"
         />
       </div>
-      <div {...stylex.props(styles.title)}>{video.title}</div>
-      <div {...stylex.props(styles.meta)}>
-        <span {...stylex.props(styles.channel)}>{video.channelTitle}</span>
-        {!Number.isNaN(date.getTime()) && (
-          <time dateTime={video.publishedAt}>
-            {date.toLocaleDateString("en-US")}
-          </time>
-        )}
+      <div {...stylex.props(styles.content)}>
+        <div {...stylex.props(styles.title)}>{video.title}</div>
+        <div {...stylex.props(styles.meta)}>
+          <span {...stylex.props(styles.channel)}>{video.channelTitle}</span>
+          {!Number.isNaN(date.getTime()) && (
+            <time dateTime={video.publishedAt}>
+              {date.toLocaleDateString("en-US")}
+            </time>
+          )}
+        </div>
       </div>
     </button>
   );
 }
 const styles = stylex.create({
   card: {
-    width: "clamp(260px, 27vw, 520px)",
+    width: {
+      default: `calc((100% - 4 * ${theme.cardGap}) / 5)`,
+      "@media (max-width: 900px)": "calc((100% - 16px) / 2)",
+    },
     flexShrink: 0,
+    display: "flex",
+    flexDirection: "column",
     padding: 0,
-    border: 0,
-    backgroundColor: "transparent",
-    color: "#f5f5f7",
+    border: "none",
+    boxShadow: "none",
+    appearance: "none",
+    backgroundColor: theme.surfaceContainerLow,
+    color: theme.onSurface,
     textAlign: "left",
     cursor: "pointer",
-    borderRadius: 10,
-    outline: {
-      default: "3px solid transparent",
-      ":focus-visible": "3px solid #fff",
-    },
-    outlineOffset: 7,
+    borderRadius: theme.radius,
+    outline: "none",
+    outlineOffset: 4,
   },
+  active: { outline: `4px solid ${theme.focus}` },
   imageWrap: {
     aspectRatio: "16 / 9",
     overflow: "hidden",
-    borderRadius: 9,
-    backgroundColor: "#202027",
+    borderTopLeftRadius: theme.radius,
+    borderTopRightRadius: theme.radius,
+    backgroundColor: theme.surfaceContainerLow,
   },
   image: {
     width: "100%",
@@ -75,24 +84,29 @@ const styles = stylex.create({
     objectFit: "cover",
     display: "block",
   },
+  content: {
+    padding: theme.cardInset,
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
   title: {
-    fontSize: "clamp(18px, 1.45vw, 28px)",
-    fontWeight: 600,
-    lineHeight: 1.5,
-    marginTop: 15,
+    fontSize: theme.titleMedium,
+    fontWeight: 500,
+    lineHeight: theme.titleMediumLine,
     display: "-webkit-box",
     WebkitLineClamp: 2,
     WebkitBoxOrient: "vertical",
     overflow: "hidden",
-    minHeight: "3em",
+    minHeight: `calc(2 * ${theme.titleMediumLine})`,
   },
   meta: {
     display: "flex",
-    gap: 14,
-    color: "#a7a7b2",
-    fontSize: "clamp(14px, 1vw, 20px)",
-    lineHeight: 1.6,
-    marginTop: 7,
+    gap: 8,
+    color: theme.onSurfaceVariant,
+    fontSize: theme.bodyMedium,
+    whiteSpace: "nowrap",
+    lineHeight: theme.bodyMediumLine,
   },
   channel: {
     overflow: "hidden",

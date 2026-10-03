@@ -2,10 +2,34 @@
   "version": 1,
   "rows": [
     {
-      "id": "japan-news",
-      "label": "Japan news",
-      "type": "search",
-      "query": "日本 ニュース"
+      "id": "bbc-news",
+      "label": "BBC News",
+      "type": "channel",
+      "channelId": "UC16niRr50-MSBwiO3YDb3RA"
+    },
+    {
+      "id": "reuters",
+      "label": "Reuters",
+      "type": "channel",
+      "channelId": "UChqUTb7kYRX8-EiaN3XFrSQ"
+    },
+    {
+      "id": "mkbhd",
+      "label": "Marques Brownlee",
+      "type": "channel",
+      "channelId": "UCBJycsmduvYEL83R_U4JriQ"
+    },
+    {
+      "id": "veritasium",
+      "label": "Veritasium",
+      "type": "channel",
+      "channelId": "UCHnyfMqiRRG1u-2MsSQLbXA"
+    },
+    {
+      "id": "nasa",
+      "label": "NASA",
+      "type": "channel",
+      "channelId": "UCLA_DiR1FfKNvjuUpBHmylQ"
     }
   ]
 }

@@ -2,6 +2,7 @@ import { useRef } from "react";
 import * as stylex from "@stylexjs/stylex";
 import type { DisplayRow, Video } from "../types";
 import { VideoCard } from "./VideoCard";
+import { theme } from "../theme.stylex";
 interface Props {
   row: DisplayRow;
   activeId?: string;
@@ -69,28 +70,34 @@ export function VideoRow({
   );
 }
 const styles = stylex.create({
-  section: { marginBottom: "clamp(32px, 4vw, 72px)" },
+  section: { marginBottom: theme.sectionGap },
   heading: {
     display: "flex",
     alignItems: "baseline",
-    gap: 24,
-    paddingInline: "clamp(24px, 4vw, 80px)",
-    marginBottom: 22,
+    gap: 16,
+    paddingInline: theme.gutter,
+    marginBottom: 4,
   },
   title: {
-    fontSize: "clamp(23px, 1.9vw, 36px)",
-    fontWeight: 600,
+    fontSize: theme.headlineSmall,
+    lineHeight: theme.headlineSmallLine,
+    fontWeight: 400,
     margin: 0,
-    letterSpacing: "0.02em",
   },
-  status: { color: "#a7a7b2", fontSize: 16 },
+  status: { color: theme.onSurfaceVariant, fontSize: theme.bodyMedium },
   track: {
     display: "flex",
-    gap: "clamp(20px, 2vw, 36px)",
+    gap: theme.cardGap,
     overflowX: "auto",
-    paddingInline: "clamp(24px, 4vw, 80px)",
-    paddingBlock: 10,
+    marginInline: `calc(${theme.gutter} - ${theme.railInset})`,
+    paddingInline: theme.railInset,
+    paddingBlock: theme.railInset,
+    scrollPaddingInline: theme.railInset,
     scrollbarWidth: "none",
   },
-  empty: { color: "#a7a7b2", fontSize: 21, marginBlock: 24 },
+  empty: {
+    color: theme.onSurfaceVariant,
+    fontSize: theme.titleMedium,
+    marginBlock: theme.sectionGap,
+  },
 });
