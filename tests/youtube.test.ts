@@ -274,4 +274,44 @@ describe("YouTube requests", () => {
     expect(urls[3].searchParams.get("pageToken")).toBe("more");
     expect(urls[4].searchParams.get("id")).toBe("aaaaaaaaaaa");
   });
+
+  it("resolves @handles with forHandle once and reports unknown handles", async () => {
+    const request = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/channels"))
+        return json(
+          url.searchParams.get("forHandle") === "@moozaru"
+            ? {
+                items: [
+                  {
+                    contentDetails: {
+                      relatedPlaylists: { uploads: "uploads-id" },
+                    },
+                  },
+                ],
+              }
+            : { items: [] },
+        );
+      if (url.pathname.endsWith("/playlistItems")) return json({ items: [] });
+      return json({ items: [] });
+    });
+    const client = new YouTubeClient(() => "key", request);
+    const channel = {
+      id: "m",
+      label: "M",
+      type: "channel" as const,
+      channelId: "@moozaru",
+    };
+    await client.page(channel, signal());
+    await client.page(channel, signal());
+    const channelCalls = request.mock.calls
+      .map(([input]) => new URL(String(input)))
+      .filter((url) => url.pathname.endsWith("/channels"));
+    expect(channelCalls).toHaveLength(1);
+    expect(channelCalls[0].searchParams.get("forHandle")).toBe("@moozaru");
+    expect(channelCalls[0].searchParams.has("id")).toBe(false);
+    await expect(
+      client.page({ ...channel, channelId: "@missing" }, signal()),
+    ).rejects.toThrow("@handle");
+  });
 });

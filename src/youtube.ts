@@ -247,14 +247,16 @@ export class YouTubeClient {
     if (!playlistId) {
       const result = await this.get(
         "channels",
-        { part: "contentDetails", id: row.channelId },
+        row.channelId.startsWith("@")
+          ? { part: "contentDetails", forHandle: row.channelId }
+          : { part: "contentDetails", id: row.channelId },
         signal,
       );
       playlistId = result.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
       if (!playlistId)
         throw new YouTubeError(
           "other",
-          "Channel not found. Check its channelId in config.json.",
+          "Channel not found. Check its channel ID or @handle in Settings.",
         );
       this.uploads.set(row.channelId, playlistId);
     }

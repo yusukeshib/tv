@@ -57,7 +57,7 @@ The public defaults contain no API key. To change the defaults for devices that 
 }
 ```
 
-Replace the example channel ID with a real channel ID (`UC` followed by 22 characters), not an `@handle`. Keep row IDs stable and unique. Reorder the array to reorder the home screen. An empty array is valid. Search queries can use any language; the interface is English.
+For `channelId`, use either a channel ID (`UC` followed by 22 characters) or an `@handle` such as `@moozaru`. Handles are resolved with the official `channels.list` `forHandle` lookup (1 quota unit) and cached in memory until reload. Keep row IDs stable and unique. Reorder the array to reorder the home screen. An empty array is valid. Search queries can use any language; the interface is English.
 
 ### Edit, Load and Dump
 

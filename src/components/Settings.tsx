@@ -444,7 +444,7 @@ export function Settings({
                     {...stylex.props(styles.input)}
                     required
                     value={row.channelId}
-                    placeholder="UC followed by 22 characters"
+                    placeholder="@handle or UC… channel ID"
                     spellCheck={false}
                     onChange={(event) =>
                       updateRow({ ...row, channelId: event.target.value })

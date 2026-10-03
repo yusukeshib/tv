@@ -97,13 +97,14 @@ export function parseConfig(value: unknown): Config {
     if (
       row.type === "channel" &&
       typeof row.channelId === "string" &&
-      /^UC[a-zA-Z0-9_-]{22}$/.test(row.channelId)
+      (/^UC[a-zA-Z0-9_-]{22}$/.test(row.channelId.trim()) ||
+        /^@[a-zA-Z0-9._-]{3,30}$/.test(row.channelId.trim()))
     )
       return {
         id: row.id,
         label: row.label,
         type: "channel",
-        channelId: row.channelId,
+        channelId: row.channelId.trim(),
       };
     throw new Error("Check the search query or channel ID.");
   });

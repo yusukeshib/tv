@@ -121,6 +121,17 @@ describe("snapshot storage", () => {
       ).toThrow();
     }
     expect(() => parseConfig({ version: 1, rows: [row, row] })).toThrow();
+    const channel = { id: "c", label: "C", type: "channel" };
+    expect(
+      parseConfig({
+        version: 1,
+        rows: [{ ...channel, channelId: " @moozaru " }],
+      }).rows[0],
+    ).toEqual({ ...channel, channelId: "@moozaru" });
+    for (const channelId of ["moozaru", "@a", "@has space", "UCshort"])
+      expect(() =>
+        parseConfig({ version: 1, rows: [{ ...channel, channelId }] }),
+      ).toThrow();
     expect(() =>
       parseConfig({
         version: 1,
