@@ -6,6 +6,7 @@ import type {
   SearchOptions,
   Video,
 } from "./types";
+import { DEFAULT_MIN_DURATION_SECONDS } from "./types";
 
 export const SNAPSHOT_KEY = "tv.snapshot.v1";
 export const API_KEY = "tv.youtube-key";
@@ -57,6 +58,9 @@ export function parseConfig(value: unknown): Config {
         !Number.isInteger(options.maxResults) ||
         (options.maxResults as number) < 1 ||
         (options.maxResults as number) > 50 ||
+        (options.minDurationSeconds !== undefined &&
+          (!Number.isSafeInteger(options.minDurationSeconds) ||
+            (options.minDurationSeconds as number) < 0)) ||
         (options.relevanceLanguage !== undefined &&
           (typeof options.relevanceLanguage !== "string" ||
             !/^[a-zA-Z]{2,3}(?:-[a-zA-Z]{2,4})?$/.test(
@@ -72,6 +76,9 @@ export function parseConfig(value: unknown): Config {
         order: options.order as SearchOptions["order"],
         timeRange: options.timeRange as SearchOptions["timeRange"],
         maxResults: options.maxResults as number,
+        ...(options.minDurationSeconds !== undefined
+          ? { minDurationSeconds: options.minDurationSeconds as number }
+          : {}),
         ...(typeof options.relevanceLanguage === "string"
           ? {
               relevanceLanguage: options.relevanceLanguage.trim().toLowerCase(),
@@ -101,8 +108,8 @@ export function parseConfig(value: unknown): Config {
 
 export const definitionKey = (row: RowDefinition): string =>
   row.type === "search"
-    ? `search:${JSON.stringify([row.search.query, row.search.order, row.search.timeRange, row.search.relevanceLanguage ?? null, row.search.regionCode ?? null, row.search.maxResults])}`
-    : `channel:${row.channelId}`;
+    ? `search:${JSON.stringify([row.search.query, row.search.order, row.search.timeRange, row.search.relevanceLanguage ?? null, row.search.regionCode ?? null, row.search.maxResults, row.search.minDurationSeconds ?? DEFAULT_MIN_DURATION_SECONDS])}`
+    : `channel:${row.channelId}:min-duration:${DEFAULT_MIN_DURATION_SECONDS}`;
 export const isVideo = (v: unknown): v is Video =>
   object(v) &&
   typeof v.id === "string" &&

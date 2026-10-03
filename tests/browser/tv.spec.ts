@@ -10,6 +10,7 @@ const config = {
 const videos = Array.from({ length: 12 }, (_, i) => ({
   id: { videoId: `video${String(i).padStart(6, "0")}` },
   statistics: { viewCount: "1234567" },
+  contentDetails: { duration: "PT10M" },
   snippet: {
     title: `News story ${i + 1}`,
     channelTitle: "News channel",

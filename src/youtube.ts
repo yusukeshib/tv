@@ -1,4 +1,5 @@
 import type { RowDefinition, Video, VideoPage } from "./types";
+import { DEFAULT_MIN_DURATION_SECONDS } from "./types";
 
 export class YouTubeError extends Error {
   constructor(
@@ -22,6 +23,7 @@ interface Item {
     relatedPlaylists?: { uploads?: string };
     videoId?: string;
     videoPublishedAt?: string;
+    duration?: string;
   };
   status?: { embeddable?: boolean; privacyStatus?: string };
   statistics?: { viewCount?: string };
@@ -49,6 +51,19 @@ function viewCount(item: Item): number | null {
   if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
   const count = Number(value);
   return Number.isSafeInteger(count) ? count : null;
+}
+function durationSeconds(item: Item): number {
+  const match =
+    /^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/.exec(
+      item.contentDetails?.duration ?? "",
+    );
+  if (!match) return 0;
+  return (
+    Number(match[1] ?? 0) * 86400 +
+    Number(match[2] ?? 0) * 3600 +
+    Number(match[3] ?? 0) * 60 +
+    Number(match[4] ?? 0)
+  );
 }
 function toVideo(item: Item): Video | undefined {
   const id = typeof item.id === "object" ? item.id.videoId : item.id;
@@ -188,14 +203,17 @@ export class YouTubeClient {
         },
         signal,
       );
-      const videos = (result.items || [])
+      let videos = (result.items || [])
         .map(toVideo)
         .filter((video): video is Video => !!video);
       if (videos.length) {
-        // One statistics request for the page, never one request per card.
+        // Fetch duration and statistics together, never one request per card.
         const statistics = await this.get(
           "videos",
-          { part: "statistics", id: videos.map((video) => video.id).join(",") },
+          {
+            part: "statistics,contentDetails",
+            id: videos.map((video) => video.id).join(","),
+          },
           signal,
         );
         const counts = new Map(
@@ -204,6 +222,18 @@ export class YouTubeClient {
             viewCount(item),
           ]),
         );
+        const eligible = new Set(
+          (statistics.items || [])
+            .filter(
+              (item) =>
+                durationSeconds(item) >=
+                (options.minDurationSeconds ?? DEFAULT_MIN_DURATION_SECONDS),
+            )
+            .map((item) =>
+              typeof item.id === "object" ? item.id.videoId : item.id,
+            ),
+        );
+        videos = videos.filter((video) => eligible.has(video.id));
         for (const video of videos)
           video.viewCount = counts.get(video.id) ?? null;
       }
@@ -239,13 +269,15 @@ export class YouTubeClient {
     if (!ids.length) return { videos: [], nextPageToken: result.nextPageToken };
     const details = await this.get(
       "videos",
-      { part: "snippet,status,statistics", id: ids.join(",") },
+      { part: "snippet,status,statistics,contentDetails", id: ids.join(",") },
       signal,
     );
     const videos = (details.items || [])
       .filter(
         (item) =>
-          item.status?.embeddable && item.status.privacyStatus === "public",
+          item.status?.embeddable &&
+          item.status.privacyStatus === "public" &&
+          durationSeconds(item) >= DEFAULT_MIN_DURATION_SECONDS,
       )
       .map(toVideo)
       .filter((video): video is Video => !!video);

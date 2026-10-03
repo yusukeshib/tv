@@ -35,7 +35,8 @@ Edit [`public/config.json`](public/config.json), then commit and push to `main`:
         "timeRange": "7d",
         "relevanceLanguage": "en",
         "regionCode": "US",
-        "maxResults": 25
+        "maxResults": 25,
+        "minDurationSeconds": 240
       }
     },
     {
@@ -58,6 +59,9 @@ Each search row has its own retrieval settings:
 - `relevanceLanguage`: optional language preference, for example `en`. YouTube may still return other languages.
 - `regionCode`: optional two-letter country code, for example `US`, for regional availability.
 - `maxResults`: 1–50 candidates per API page.
+- `minDurationSeconds`: optional provider-independent minimum video length in seconds (non-negative integer, default `240`). Filtering happens after retrieval, so a page may contain fewer displayed videos. Videos with missing or invalid durations are excluded when a positive minimum applies. `0` disables the minimum.
+
+Home excludes videos shorter than four minutes by default, including on channel rows. This is a duration policy, not a YouTube Shorts classifier: short regular videos are excluded too, while videos longer than 20 minutes remain eligible. Search rows can override the minimum. Provider-specific duration retrieval and parsing stay inside the provider client.
 
 The bundled config uses five specific channels (BBC News, Reuters, Marques Brownlee, Veritasium, and NASA) rather than broad keyword searches. The search example above retrieves the most-viewed candidates published in the past seven days, then displays those candidates newest first. This does not guarantee editorial quality or represent every video published in that time range. Loading additional pages fetches more candidates using the same settings and re-sorts the retrieved set by publication time.
 

@@ -28,6 +28,7 @@ describe("snapshot storage", () => {
       { relevanceLanguage: "en" },
       { regionCode: "US" },
       { maxResults: 50 },
+      { minDurationSeconds: 600 },
     ]) {
       expect(definitionKey(config({ ...row.search, ...change }))).not.toBe(
         definitionKey(row),
@@ -42,6 +43,10 @@ describe("snapshot storage", () => {
       { maxResults: 51 },
       { maxResults: 0 },
       { maxResults: 1.5 },
+      { minDurationSeconds: Number.POSITIVE_INFINITY },
+      { minDurationSeconds: -1 },
+      { minDurationSeconds: 240.5 },
+      { minDurationSeconds: "240" },
       { regionCode: "USA" },
       { relevanceLanguage: "" },
     ]) {

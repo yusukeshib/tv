@@ -1,3 +1,6 @@
+// Provider-independent minimum length for home videos.
+export const DEFAULT_MIN_DURATION_SECONDS = 240;
+
 export interface SearchOptions {
   query: string;
   order: "relevance" | "viewCount" | "rating" | "date";
@@ -5,6 +8,7 @@ export interface SearchOptions {
   relevanceLanguage?: string;
   regionCode?: string;
   maxResults: number;
+  minDurationSeconds?: number;
 }
 
 export type RowDefinition =

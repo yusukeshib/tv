@@ -20,8 +20,16 @@ describe("YouTube requests", () => {
       .mockResolvedValueOnce(
         json({
           items: [
-            { id: "bbbbbbbbbbb", statistics: { viewCount: "0" } },
-            { id: "aaaaaaaaaaa", statistics: { viewCount: "1234567" } },
+            {
+              id: "bbbbbbbbbbb",
+              statistics: { viewCount: "0" },
+              contentDetails: { duration: "PT4M" },
+            },
+            {
+              id: "aaaaaaaaaaa",
+              statistics: { viewCount: "1234567" },
+              contentDetails: { duration: "PT1H" },
+            },
           ],
         }),
       );
@@ -48,11 +56,52 @@ describe("YouTube requests", () => {
     expect(result.nextPageToken).toBe("next");
     expect(result.videos.map((video) => video.viewCount)).toEqual([1234567, 0]);
     const statisticsURL = new URL(String(request.mock.calls[1][0]));
-    expect(statisticsURL.searchParams.get("part")).toBe("statistics");
+    expect(statisticsURL.searchParams.get("part")).toBe(
+      "statistics,contentDetails",
+    );
     expect(statisticsURL.searchParams.get("id")).toBe(
       "bbbbbbbbbbb,aaaaaaaaaaa",
     );
   });
+
+  it.each([undefined, 600])(
+    "filters short and unknown durations with minimum %s while retaining long videos and pagination",
+    async (minimum) => {
+      const durations = [
+        "PT3M",
+        "PT3M59S",
+        "PT4M",
+        "PT10M",
+        "PT21M",
+        "PT1H",
+        undefined,
+        "invalid",
+      ];
+      const ids = durations.map((_, index) => String(index).repeat(11));
+      const request = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(
+          json({ items: ids.map((id) => item(id)), nextPageToken: "more" }),
+        )
+        .mockResolvedValueOnce(
+          json({
+            items: ids.map((id, index) => ({
+              id,
+              contentDetails: { duration: durations[index] },
+            })),
+          }),
+        );
+      const result = await new YouTubeClient(() => "key", request).page(
+        { ...row, search: { ...row.search, minDurationSeconds: minimum } },
+        signal(),
+      );
+      expect(result.videos.map((video) => video.id)).toEqual(
+        ids.slice(minimum ? 3 : 2, 6),
+      );
+      expect(result.nextPageToken).toBe("more");
+      expect(request).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it("forwards options and freezes relative cutoffs across pagination", async () => {
     const request = vi
@@ -169,6 +218,7 @@ describe("YouTube requests", () => {
       ...item(),
       id: "aaaaaaaaaaa",
       status: { embeddable: true, privacyStatus: "public" },
+      contentDetails: { duration: "PT4M" },
     };
     const request = vi.fn<typeof fetch>().mockImplementation(async (input) => {
       const url = new URL(String(input));
@@ -186,6 +236,12 @@ describe("YouTube requests", () => {
       return json({
         items: [
           publicItem,
+          {
+            ...publicItem,
+            id: "ddddddddddd",
+            contentDetails: { duration: "PT3M" },
+          },
+          { ...publicItem, id: "eeeeeeeeeee", contentDetails: {} },
           {
             ...publicItem,
             id: "bbbbbbbbbbb",
