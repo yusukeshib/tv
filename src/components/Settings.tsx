@@ -158,6 +158,17 @@ export function Settings({
       rows: current.rows.map((row) => (row.id === next.id ? next : row)),
     }));
   }
+  function moveRow(id: string, direction: -1 | 1) {
+    setDraft((current) => {
+      const index = current.rows.findIndex((row) => row.id === id);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= current.rows.length)
+        return current;
+      const rows = [...current.rows];
+      [rows[index], rows[target]] = [rows[target], rows[index]];
+      return { ...current, rows };
+    });
+  }
   function addRow(type: RowDefinition["type"]) {
     const id = `row-${crypto.randomUUID()}`;
     const row: RowDefinition =
@@ -367,6 +378,24 @@ export function Settings({
                 </label>
                 <button
                   type="button"
+                  aria-label={`Move ${row.label || "row"} up`}
+                  disabled={index === 0}
+                  onClick={() => moveRow(row.id, -1)}
+                  {...stylex.props(styles.button)}
+                >
+                  ↑ Up
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Move ${row.label || "row"} down`}
+                  disabled={index === draft.rows.length - 1}
+                  onClick={() => moveRow(row.id, 1)}
+                  {...stylex.props(styles.button)}
+                >
+                  ↓ Down
+                </button>
+                <button
+                  type="button"
                   aria-label={`Delete ${row.label || "row"}`}
                   {...stylex.props(styles.button)}
                   onClick={() =>
@@ -486,7 +515,7 @@ const styles = stylex.create({
     flexDirection: "column",
     gap: 16,
   },
-  rowHeader: { display: "flex", alignItems: "end", gap: 16 },
+  rowHeader: { display: "flex", alignItems: "end", gap: 16, flexWrap: "wrap" },
   grow: { flexGrow: 1, minWidth: 0 },
   fields: {
     display: "grid",

@@ -900,6 +900,137 @@ test("settings: failed saves leave the saved key and list intact", async ({
   ).toBeVisible();
 });
 
+test("settings: reordered rows persist on Home and in JSON without refetching their caches", async ({
+  page,
+}) => {
+  await openHome(page, {
+    version: 1,
+    rows: [
+      ...config.rows,
+      { ...config.rows[0], id: "space", label: "Space", query: "Space" },
+      {
+        id: "bbc",
+        label: "BBC News",
+        type: "channel",
+        channelId: "UC16niRr50-MSBwiO3YDb3RA",
+      },
+    ],
+  });
+  await expect(
+    page.locator('[data-row-scroll="bbc"]').getByRole("button").first(),
+  ).toBeVisible();
+  const cached = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("tv.snapshot.v1")!).rows,
+  );
+  await openSettings(page);
+  await expect(
+    page.getByRole("button", { name: "Move Japan news up", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Move BBC News down", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Move Space up", exact: true })
+    .click();
+  await expect(
+    page.getByRole("group", { name: "1. Space", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Move Space down", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Move BBC News up", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Move BBC News up", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Move BBC News up", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Move Space down", exact: true }),
+  ).toBeDisabled();
+  const downloadEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Dump JSON", exact: true }).click();
+  const download = await downloadEvent;
+  const dumped = JSON.parse(await readFile((await download.path())!, "utf8"));
+  expect(dumped.rows.map((row: { id: string }) => row.id)).toEqual([
+    "bbc",
+    "news",
+    "space",
+  ]);
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(page).toHaveURL(/#\/$/);
+  expect(
+    await page
+      .locator("[data-row-scroll]")
+      .evaluateAll((tracks) =>
+        tracks.map((track) => track.getAttribute("data-row-scroll")),
+      ),
+  ).toEqual(["bbc", "news", "space"]);
+  expect(
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem("tv.snapshot.v1")!).rows,
+    ),
+  ).toEqual(cached);
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "BBC News", exact: true }),
+  ).toBeVisible();
+  expect(
+    (await savedSettings(page)).config.rows.map(
+      (row: { id: string }) => row.id,
+    ),
+  ).toEqual(["bbc", "news", "space"]);
+  await openSettings(page);
+  await expect(
+    page.getByRole("group", { name: "1. BBC News", exact: true }),
+  ).toBeVisible();
+  await loadSettingsJSON(page, { ...dumped, rows: [...dumped.rows].reverse() });
+  await expect(page.getByRole("status")).toContainText("Loaded settings");
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(page).toHaveURL(/#\/$/);
+  expect(
+    (await savedSettings(page)).config.rows.map(
+      (row: { id: string }) => row.id,
+    ),
+  ).toEqual(["space", "news", "bbc"]);
+});
+
+test("settings: Cancel leaves the saved row order unchanged", async ({
+  page,
+}) => {
+  await openHome(page, {
+    version: 1,
+    rows: [
+      ...config.rows,
+      { ...config.rows[0], id: "space", label: "Space", query: "Space" },
+    ],
+  });
+  const before = await savedSettings(page);
+  await openSettings(page);
+  await page
+    .getByRole("button", { name: "Move Japan news down", exact: true })
+    .click();
+  await expect(
+    page.getByRole("group", { name: "1. Space", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page).toHaveURL(/#\/$/);
+  expect(await savedSettings(page)).toEqual(before);
+  expect(
+    await page
+      .locator("[data-row-scroll]")
+      .evaluateAll((tracks) =>
+        tracks.map((track) => track.getAttribute("data-row-scroll")),
+      ),
+  ).toEqual(["news", "space"]);
+});
+
 test("settings: editing an existing search replaces its conditions while Home playback still works", async ({
   page,
 }) => {

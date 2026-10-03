@@ -65,7 +65,7 @@ The gear opens an editor with:
 
 - **API key**.
 - **Search defaults**: candidate order, time range, language preference, region, page size and minimum duration. New search rows copy these defaults; changing defaults does not rewrite existing searches.
-- **Home list**: add searches/channels, edit labels and each row’s conditions, or delete rows. Defaults are ordinary editable/deletable rows.
+- **Home list**: add searches/channels, edit labels and each row’s conditions, move rows **Up / Down**, or delete rows. Save applies the order to Home; JSON preserves it. Defaults are ordinary editable/deletable rows.
 - **Load JSON** replaces the editor’s draft after validation, including the key and search defaults. **Save settings** applies everything together. **Cancel** leaves the saved settings unchanged. An invalid file or failed storage write does not partially apply changes.
 - **Dump JSON** downloads the current valid draft, including unsaved edits. It contains every user setting, but no cached video metadata, quota cooldowns or navigation state.
 
