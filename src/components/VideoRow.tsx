@@ -93,7 +93,8 @@ const styles = stylex.create({
     paddingInline: theme.railInset,
     paddingBlock: theme.railInset,
     scrollPaddingInline: theme.railInset,
-    scrollbarWidth: "none",
+    scrollbarWidth: "auto",
+    scrollbarColor: `${theme.onSurfaceVariant} ${theme.surfaceContainerLow}`,
   },
   empty: {
     color: theme.onSurfaceVariant,
