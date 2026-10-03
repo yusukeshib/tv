@@ -58,7 +58,7 @@ async function openHome(page: Page, homeConfig = config) {
   });
   await page.goto("./");
   await expect(
-    page.getByRole("button", { name: /News story 1,/ }),
+    page.getByRole("button", { name: /News story 1,/ }).first(),
   ).toBeVisible();
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
@@ -298,7 +298,71 @@ test("app updates wait for playback to close, then reload exactly once", async (
   expect(navigations).toBe(1);
 });
 
-test("returning from playback preserves vertical and every row's horizontal scroll", async ({
+for (const selectedRow of ["row0", "row1"]) {
+  test(`returning from playback preserves vertical and every row's horizontal scroll (${selectedRow})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 600 });
+    await openHome(page, {
+      version: 1,
+      rows: Array.from({ length: 4 }, (_, i) => ({
+        id: `row${i}`,
+        label: `Row ${i}`,
+        type: "search",
+        query: `row ${i}`,
+      })),
+    });
+    const selected = page
+      .locator(`[data-row-scroll="${selectedRow}"]`)
+      .getByRole("button")
+      .nth(6);
+    await selected.evaluate((node) => node.focus({ preventScroll: true }));
+    const before = await page.evaluate(() => {
+      const tracks = [
+        ...document.querySelectorAll<HTMLElement>("[data-row-scroll]"),
+      ];
+      tracks.forEach((track, index) => {
+        track.scrollLeft = 350 + index * 100;
+      });
+      window.scrollTo(0, 300);
+      return {
+        top: window.scrollY,
+        tracks: tracks.map((track) => track.scrollLeft),
+      };
+    });
+    await page.keyboard.press("Enter");
+    await expect(page.locator("iframe")).toBeVisible();
+    await expect(page).toHaveURL(/#\/watch\/video000006$/);
+    await page.goBack();
+    await expect(selected).toBeFocused();
+    await expect
+      .poll(() =>
+        page.evaluate(() => ({
+          top: window.scrollY,
+          tracks: [
+            ...document.querySelectorAll<HTMLElement>("[data-row-scroll]"),
+          ].map((track) => track.scrollLeft),
+        })),
+      )
+      .toEqual(before);
+    await page.goForward();
+    await expect(page.locator("iframe")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(selected).toBeFocused();
+    await expect
+      .poll(() =>
+        page.evaluate(() => ({
+          top: window.scrollY,
+          tracks: [
+            ...document.querySelectorAll<HTMLElement>("[data-row-scroll]"),
+          ].map((track) => track.scrollLeft),
+        })),
+      )
+      .toEqual(before);
+  });
+}
+
+test("keyboard scroll policy keeps axes separate and top row at zero", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 600 });
@@ -311,53 +375,113 @@ test("returning from playback preserves vertical and every row's horizontal scro
       query: `row ${i}`,
     })),
   });
-  const selected = page
-    .locator('[data-row-scroll="row1"]')
-    .getByRole("button")
-    .nth(6);
-  await selected.evaluate((node) => node.focus({ preventScroll: true }));
-  const before = await page.evaluate(() => {
-    const tracks = [
-      ...document.querySelectorAll<HTMLElement>("[data-row-scroll]"),
-    ];
-    tracks.forEach((track, index) => {
-      track.scrollLeft = 350 + index * 100;
-    });
-    window.scrollTo(0, 300);
+  const top = page.locator('[data-row-scroll="row0"]');
+  await top.getByRole("button").first().focus();
+  const beforeHorizontal = await page.evaluate(() => window.scrollY);
+  for (let i = 0; i < 7; i++) await page.keyboard.press("ArrowRight");
+  expect(await page.evaluate(() => window.scrollY)).toBe(beforeHorizontal);
+  const topHorizontal = await top.evaluate((node) => node.scrollLeft);
+  expect(topHorizontal).toBeGreaterThan(0);
+  await page.keyboard.press("ArrowDown");
+  const second = page.locator('[data-row-scroll="row1"]');
+  await expect(second.getByRole("button").nth(7)).toBeFocused();
+  const geometry = await second.evaluate((track) => {
+    const section = track.closest("section")!.getBoundingClientRect();
+    const card = track.querySelectorAll("button")[7].getBoundingClientRect();
+    const rect = track.getBoundingClientRect();
     return {
-      top: window.scrollY,
-      tracks: tracks.map((track) => track.scrollLeft),
+      top: section.top,
+      bottom: section.bottom,
+      viewport: innerHeight,
+      cardLeft: card.left,
+      cardRight: card.right,
+      trackLeft: rect.left,
+      trackRight: rect.right,
+      padding: parseFloat(getComputedStyle(track).paddingTop),
     };
   });
-  await page.keyboard.press("Enter");
-  await expect(page.locator("iframe")).toBeVisible();
-  await expect(page).toHaveURL(/#\/watch\/video000006$/);
-  await page.goBack();
+  expect(geometry.top).toBeGreaterThanOrEqual(geometry.padding - 1);
+  expect(geometry.bottom).toBeLessThanOrEqual(
+    geometry.viewport - geometry.padding + 1,
+  );
+  expect(geometry.cardLeft).toBeGreaterThanOrEqual(
+    geometry.trackLeft + geometry.padding - 1,
+  );
+  expect(geometry.cardRight).toBeLessThanOrEqual(
+    geometry.trackRight - geometry.padding + 1,
+  );
+  expect(await top.evaluate((node) => node.scrollLeft)).toBe(topHorizontal);
+  const secondVertical = await page.evaluate(() => window.scrollY);
+  await page.keyboard.press("ArrowRight");
+  expect(await page.evaluate(() => window.scrollY)).toBe(secondVertical);
+  await page.keyboard.press("ArrowLeft");
+  const secondHorizontal = await second.evaluate((node) => node.scrollLeft);
+  await page.keyboard.press("ArrowUp");
+  await expect(top.getByRole("button").nth(7)).toBeFocused();
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect(await top.evaluate((node) => node.scrollLeft)).toBe(topHorizontal);
+  expect(await second.evaluate((node) => node.scrollLeft)).toBe(
+    secondHorizontal,
+  );
+  await page.evaluate(() => window.scrollTo(0, 100));
+  await page.keyboard.press("ArrowRight");
+  expect(await page.evaluate(() => window.scrollY)).toBe(100);
+  await page.keyboard.press("ArrowUp");
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});
+
+test("manual scroll and selection survive background video refresh", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await openHome(page, {
+    version: 1,
+    rows: [
+      ...config.rows,
+      { id: "other", label: "Other news", type: "search", query: "other" },
+    ],
+  });
+  const selected = page
+    .locator('[data-row-scroll="news"]')
+    .getByRole("button", { name: /News story 7,/ });
+  await selected.evaluate((node) => node.focus({ preventScroll: true }));
+  const track = page.locator('[data-row-scroll="news"]');
+  await track.evaluate((node) => {
+    node.scrollLeft = 200;
+  });
+  await page.evaluate(() => window.scrollTo(0, 100));
+  await page.route("https://www.googleapis.com/**", (route) =>
+    route.fulfill({
+      headers: { "Access-Control-Allow-Origin": "*" },
+      json: {
+        items: [
+          {
+            ...videos[0],
+            id: { videoId: "newvideo000" },
+            snippet: {
+              ...videos[0].snippet,
+              title: "New story",
+              publishedAt: new Date(Date.now() + 3600000).toISOString(),
+            },
+          },
+          ...videos,
+        ],
+      },
+    }),
+  );
+  await page.clock.setSystemTime(new Date(Date.now() + 610000));
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect(track.getByRole("button", { name: /New story,/ })).toHaveCount(
+    1,
+  );
   await expect(selected).toBeFocused();
-  await expect
-    .poll(() =>
-      page.evaluate(() => ({
-        top: window.scrollY,
-        tracks: [
-          ...document.querySelectorAll<HTMLElement>("[data-row-scroll]"),
-        ].map((track) => track.scrollLeft),
-      })),
-    )
-    .toEqual(before);
-  await page.goForward();
-  await expect(page.locator("iframe")).toBeVisible();
-  await page.keyboard.press("Escape");
+  expect(await track.evaluate((node) => node.scrollLeft)).toBe(200);
+  expect(await page.evaluate(() => window.scrollY)).toBe(100);
+  await page.reload();
   await expect(selected).toBeFocused();
-  await expect
-    .poll(() =>
-      page.evaluate(() => ({
-        top: window.scrollY,
-        tracks: [
-          ...document.querySelectorAll<HTMLElement>("[data-row-scroll]"),
-        ].map((track) => track.scrollLeft),
-      })),
-    )
-    .toEqual(before);
+  expect(await track.evaluate((node) => node.scrollLeft)).toBe(200);
+  expect(await page.evaluate(() => window.scrollY)).toBe(100);
 });
 
 test("cached watch URL survives reload", async ({ page }) => {

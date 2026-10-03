@@ -57,7 +57,6 @@ export function Home({
     tracks: Record<string, number>;
   } | null>(null);
   const cardHadFocus = useRef(true);
-  const anchor = useRef<{ x: number; y: number } | null>(null);
   const key = (row: string, video: string) => JSON.stringify([row, video]);
   const selectionRef = useRef(selected);
   selectionRef.current = selected;
@@ -94,7 +93,7 @@ export function Home({
   useLayoutEffect(() => {
     const current = selectionRef.current;
     const row =
-      rows.find((r) => r.id === current?.row) ??
+      rows.find((r) => r.id === current?.row && r.videos.length) ??
       rows.find((r) => r.videos.length);
     const video =
       row?.videos.find((v) => v.id === current?.video) ??
@@ -112,8 +111,10 @@ export function Home({
         next.row !== current.row ||
         next.video !== current.video ||
         next.index !== current.index
-      )
+      ) {
+        selectionRef.current = next;
         setSelected(next);
+      }
       const node = buttons.current.get(key(row.id, video.id));
       if (
         !hidden &&
@@ -137,40 +138,77 @@ export function Home({
             });
           window.scrollTo({ top: saved.top });
           restorePending.current = false;
-        } else if (anchor.current && current?.video === video.id) {
-          const rect = node.getBoundingClientRect();
-          node.parentElement?.scrollBy({ left: rect.x - anchor.current.x });
-          window.scrollBy({ top: rect.y - anchor.current.y });
-        } else node.scrollIntoView({ block: "nearest", inline: "nearest" });
+        } else if (
+          !current ||
+          current.row !== row.id ||
+          current.video !== video.id
+        ) {
+          scrollSelection(node, rows.indexOf(row), true);
+        }
       }
     } else if (!hidden && (cardHadFocus.current || wasHidden.current))
       home.current?.focus();
     wasHidden.current = hidden;
-    return () => {
-      if (hidden) return;
-      const s = selectionRef.current;
-      const node = s && buttons.current.get(key(s.row, s.video));
-      if (node) {
-        const rect = node.getBoundingClientRect();
-        anchor.current = { x: rect.x, y: rect.y };
-      }
-    };
   }, [rows, hidden]);
-  function focus(rowIndex: number, index: number) {
+  function scrollSelection(
+    node: HTMLButtonElement,
+    rowIndex: number,
+    vertical: boolean,
+  ) {
+    const track = node.parentElement;
+    if (!track) return;
+    const trackRect = track.getBoundingClientRect();
+    const cardRect = node.getBoundingClientRect();
+    const trackStyle = getComputedStyle(track);
+    const left = trackRect.left + parseFloat(trackStyle.paddingLeft);
+    const right = trackRect.right - parseFloat(trackStyle.paddingRight);
+    const horizontalDelta =
+      cardRect.left < left
+        ? cardRect.left - left
+        : cardRect.right > right
+          ? cardRect.right - right
+          : 0;
+    if (horizontalDelta)
+      track.scrollBy({ left: horizontalDelta, behavior: "instant" });
+    if (!vertical) return;
+    if (rowIndex === rows.findIndex((row) => row.videos.length)) {
+      window.scrollTo({ top: 0, behavior: "instant" });
+      return;
+    }
+    const section = track.closest("section");
+    if (!section) return;
+    const rect = section.getBoundingClientRect();
+    const inset = parseFloat(trackStyle.paddingTop);
+    const bottom = window.innerHeight - inset;
+    const delta =
+      rect.top < inset || rect.height > bottom - inset
+        ? rect.top - inset
+        : rect.bottom > bottom
+          ? rect.bottom - bottom
+          : 0;
+    if (delta) window.scrollBy({ top: delta, behavior: "instant" });
+  }
+  function focus(rowIndex: number, index: number, vertical: boolean) {
     const row = rows[rowIndex];
     const video =
       row?.videos[Math.min(Math.max(index, 0), row.videos.length - 1)];
     if (!video) return;
     const node = buttons.current.get(key(row.id, video.id));
-    node?.focus({ preventScroll: true });
-    node?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    if (!node) return;
+    node.focus({ preventScroll: true });
+    scrollSelection(node, rowIndex, vertical);
   }
   function navigate(event: KeyboardEvent) {
-    if (!selected) return;
-    const rowIndex = rows.findIndex((r) => r.id === selected.row);
+    const current = selectionRef.current;
+    if (!current) return;
+    const rowIndex = rows.findIndex((r) => r.id === current.row);
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
       event.preventDefault();
-      focus(rowIndex, selected.index + (event.key === "ArrowRight" ? 1 : -1));
+      focus(
+        rowIndex,
+        current.index + (event.key === "ArrowRight" ? 1 : -1),
+        false,
+      );
     }
     if (event.key === "ArrowUp" || event.key === "ArrowDown") {
       event.preventDefault();
@@ -178,7 +216,12 @@ export function Home({
       let next = rowIndex + direction;
       while (next >= 0 && next < rows.length && !rows[next].videos.length)
         next += direction;
-      if (next >= 0 && next < rows.length) focus(next, selected.index);
+      if (next >= 0 && next < rows.length) focus(next, current.index, true);
+      else if (
+        event.key === "ArrowUp" &&
+        rowIndex === rows.findIndex((row) => row.videos.length)
+      )
+        window.scrollTo({ top: 0, behavior: "instant" });
     }
   }
   return (
@@ -188,6 +231,13 @@ export function Home({
       hidden={hidden}
       {...stylex.props(styles.home)}
       onKeyDown={navigate}
+      onBlurCapture={(event) => {
+        if (
+          event.relatedTarget &&
+          !event.currentTarget.contains(event.relatedTarget as Node)
+        )
+          cardHadFocus.current = false;
+      }}
     >
       {notice && (
         <p {...stylex.props(styles.notice)} role="status">
@@ -208,11 +258,13 @@ export function Home({
             }}
             onFocus={(video) => {
               cardHadFocus.current = true;
-              setSelected({
+              const next = {
                 row: row.id,
                 video: video.id,
                 index: row.videos.indexOf(video),
-              });
+              };
+              selectionRef.current = next;
+              setSelected(next);
             }}
             onPlay={(video) => {
               const tracks: Record<string, number> = {};

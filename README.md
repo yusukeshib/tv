@@ -67,6 +67,8 @@ The bundled config uses five specific channels (BBC News, Reuters, Marques Brown
 
 Navigation uses React Router hash routes so GitHub Pages needs no server rewrite rules: `#/` for Home, `#/watch/:videoId` for playback, and `#/setup` for setup (`#setup` links remain supported). Browser Back/Forward and the player's Back/Escape restore Home's vertical and per-row horizontal scroll. Playback URLs resolve metadata from the saved library; unavailable videos show a Home link rather than fetching arbitrary provider metadata. URLs never include API keys.
 
+Home keyboard scrolling is axis-specific: Left/Right reveal the selected card within that row without changing vertical scroll; Up/Down reveal the row heading and cards with focus-ring clearance. Navigating to the first selectable row resets vertical scroll to zero. Playback/history/reload restoration takes priority over that rule, preserving the exact saved offsets. Background updates retain the selected video and do not override manual scrolling.
+
 Changing any retrieval setting invalidates that row’s cached results and pagination tokens. Config is the only source of presets; old ad-hoc search data is removed from local storage.
 
 The deployed browser reads the **raw GitHub file**, not the cached Pages app, every minute while visible. The development server reads the local `public/config.json` instead, so unpushed edits can be previewed. GitHub/CDN delays can still affect freshness. Invalid config leaves the previous valid config in place. New or changed rows load immediately; changing only labels or order reuses saved videos.
