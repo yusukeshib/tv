@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "rows": [
+    {
+      "id": "japan-news",
+      "label": "Japan news",
+      "type": "search",
+      "query": "日本 ニュース"
+    }
+  ]
+}

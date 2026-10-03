@@ -1,0 +1,37 @@
+@layer reset {
+  * {
+    box-sizing: border-box;
+  }
+  html {
+    color-scheme: dark;
+    background: #101112;
+  }
+  body {
+    margin: 0;
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans JP",
+      sans-serif;
+  }
+  button,
+  input {
+    font: inherit;
+  }
+  button {
+    cursor: pointer;
+  }
+  img {
+    display: block;
+  }
+  [hidden] {
+    display: none !important;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
