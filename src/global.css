@@ -40,6 +40,38 @@
   [data-row-scroll]::-webkit-scrollbar-thumb:hover {
     background: #ffffff;
   }
+  /* Native range controls need engine-specific pseudo-elements. */
+  [data-player-seek]::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 999px;
+    background: #8e8b93;
+  }
+  [data-player-seek]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    margin-top: -7px;
+    border: 2px solid #141218;
+    border-radius: 50%;
+    background: #fff;
+  }
+  [data-player-seek]::-moz-range-track {
+    height: 6px;
+    border-radius: 999px;
+    background: #8e8b93;
+  }
+  [data-player-seek]::-moz-range-progress {
+    height: 6px;
+    border-radius: 999px;
+    background: #fff;
+  }
+  [data-player-seek]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #141218;
+    border-radius: 50%;
+    background: #fff;
+  }
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

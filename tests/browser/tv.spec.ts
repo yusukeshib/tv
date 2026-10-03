@@ -185,6 +185,51 @@ test("keyboard selection plays and returns to the same card; only the settings g
   await page.screenshot({ path: "test-results/home.png" });
 });
 
+test("player: seekbar stays above the iframe and supports pointer seeking", async ({
+  page,
+}) => {
+  await openHome(page);
+  await page
+    .getByRole("button", { name: /News story 1,/ })
+    .first()
+    .click();
+  const seek = page.getByRole("slider", { name: "Seek" });
+  await expect(seek).toBeEnabled();
+  // The embed must not be able to cover our controls with its own stacking order.
+  await page.locator("iframe").evaluate((frame) => {
+    frame.style.zIndex = "9999";
+  });
+  expect(
+    await seek.evaluate((input) => {
+      const rect = input.getBoundingClientRect();
+      return (
+        document.elementFromPoint(
+          rect.x + rect.width / 2,
+          rect.y + rect.height / 2,
+        ) === input
+      );
+    }),
+  ).toBe(true);
+  await expect(seek).toHaveCSS("appearance", "none");
+  await expect(page.getByLabel("Playback controls").locator("div")).toHaveCSS(
+    "background-color",
+    "rgba(12, 12, 16, 0.9)",
+  );
+  const box = (await seek.boundingBox())!;
+  await seek.click({ position: { x: box.width * 0.6, y: box.height / 2 } });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        "window.__playerMock.calls.filter(c => c.command === 'seek').at(-1)?.value ?? 0",
+      ),
+    )
+    .toBeGreaterThan(100);
+  await page.getByRole("button", { name: "Back to home" }).click();
+  await expect(
+    page.getByRole("button", { name: /News story 1,/ }).first(),
+  ).toBeFocused();
+});
+
 test("player: video covers the full viewport with controls overlaid at every aspect ratio", async ({
   page,
 }) => {

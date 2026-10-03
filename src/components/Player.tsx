@@ -215,6 +215,7 @@ export function Player({
           <input
             {...stylex.props(styles.seek)}
             type="range"
+            data-player-seek
             aria-label="Seek"
             min={0}
             max={duration || 1}
@@ -278,6 +279,7 @@ const styles = stylex.create({
   frameWrap: {
     position: "absolute",
     inset: 0,
+    zIndex: 0,
     overflow: "hidden",
     backgroundColor: "#000",
   },
@@ -293,13 +295,27 @@ const styles = stylex.create({
     backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.8), transparent)",
     pointerEvents: "none",
   },
-  timeline: { display: "flex", alignItems: "center", gap: 16 },
+  timeline: {
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+    paddingBlock: 12,
+    paddingInline: 16,
+    borderRadius: 12,
+    backgroundColor: "rgba(12,12,16,0.9)",
+  },
   seek: {
     pointerEvents: "auto",
     flexGrow: 1,
     minWidth: 40,
     height: 26,
-    accentColor: "#fff",
+    margin: 0,
+    appearance: "none",
+    backgroundColor: "transparent",
+    border: 0,
+    borderRadius: 4,
+    outline: { default: "none", ":focus-visible": "2px solid #fff" },
+    outlineOffset: 4,
     cursor: "pointer",
   },
   time: {
