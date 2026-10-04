@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { playerAPIMock } from "./playerMock";
 
@@ -1201,4 +1201,274 @@ test("settings: editing an existing search replaces its conditions while Home pl
   await expect(
     page.getByRole("button", { name: /News story 1,/ }).first(),
   ).toBeFocused();
+});
+
+async function tabTo(page: Page, target: Locator) {
+  for (let count = 0; count < 100; count++) {
+    if (await target.evaluate((node) => node === document.activeElement))
+      return;
+    await page.keyboard.press("Tab");
+  }
+  await expect(target).toBeFocused();
+}
+
+async function replaceByKeyboard(page: Page, value: string) {
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.insertText(value);
+}
+
+async function keyboardSettings(page: Page, shortcut = "Control+,") {
+  await page.keyboard.press(shortcut);
+  await expect(page).toHaveURL(/#\/settings$/);
+  await expect(page.getByLabel("API key", { exact: true })).toBeFocused();
+}
+
+test("keyboard-only: settings shortcut preserves draft, selection and scroll; Escape cancels", async ({
+  page,
+}) => {
+  await openHome(page);
+  for (let index = 0; index < 8; index++)
+    await page.keyboard.press("ArrowRight");
+  const selected = page.getByRole("button", { name: /News story 9,/ });
+  await expect(selected).toBeFocused();
+  const track = page.locator('[data-row-scroll="news"]');
+  const scroll = await track.evaluate((node) => node.scrollLeft);
+  const before = await savedSettings(page);
+  await keyboardSettings(page);
+  await replaceByKeyboard(page, "unsaved-key");
+  await page.keyboard.press("Control+,");
+  await expect(page.getByLabel("API key", { exact: true })).toHaveValue(
+    "unsaved-key",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/#\/$/);
+  await expect(selected).toBeFocused();
+  expect(await track.evaluate((node) => node.scrollLeft)).toBe(scroll);
+  expect(await savedSettings(page)).toEqual(before);
+});
+
+for (const modifier of ["Control", "Meta"]) {
+  test(`keyboard-only: ${modifier} shortcuts save edits through the existing settings form`, async ({
+    page,
+  }) => {
+    await openHome(page);
+    await keyboardSettings(page, `${modifier}+,`);
+    await tabTo(page, page.getByLabel("Label", { exact: true }));
+    await replaceByKeyboard(page, "Keyboard news");
+    await page.keyboard.press(`${modifier}+s`);
+    await expect(page).toHaveURL(/#\/$/);
+    await expect(
+      page.getByRole("heading", { name: "Keyboard news" }),
+    ).toBeVisible();
+    expect((await savedSettings(page)).config.rows[0].label).toBe(
+      "Keyboard news",
+    );
+  });
+}
+
+test("keyboard-only: save validates required input and ignores composition shortcuts", async ({
+  page,
+}) => {
+  await openHome(page);
+  const before = await savedSettings(page);
+  await keyboardSettings(page);
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Control+s");
+  await expect(page).toHaveURL(/#\/settings$/);
+  await expect(page.getByLabel("API key", { exact: true })).toBeFocused();
+  expect(await savedSettings(page)).toEqual(before);
+  await page.keyboard.insertText("restored-key");
+  await page.evaluate(() => {
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Escape",
+        isComposing: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  });
+  await expect(page).toHaveURL(/#\/settings$/);
+  await page.keyboard.press("Escape");
+  await page.evaluate(() => {
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: ",",
+        ctrlKey: true,
+        isComposing: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  });
+  await expect(page).toHaveURL(/#\/$/);
+});
+
+test("keyboard-only: first-time setup can open settings and save without a mouse", async ({
+  page,
+}) => {
+  await mockNetwork(page);
+  await page.goto("./");
+  await keyboardSettings(page);
+  await page.keyboard.press("Escape");
+  await expect(page.getByLabel("API key", { exact: true })).toBeFocused();
+  await page.keyboard.insertText("keyboard-setup-key");
+  await tabTo(
+    page,
+    page.getByRole("button", { name: "Open settings / Load JSON" }),
+  );
+  await page.keyboard.press("Control+s");
+  await expect(page.getByRole("heading", { name: "Japan news" })).toBeVisible();
+  expect((await savedSettings(page)).apiKey).toBe("keyboard-setup-key");
+  await page.goto("./#/setup");
+  await expect(page.getByLabel("API key", { exact: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/#\/$/);
+  await expect(page.getByRole("heading", { name: "Japan news" })).toBeVisible();
+});
+
+test("keyboard-only: adding, moving and deleting rows keeps meaningful focus", async ({
+  page,
+}) => {
+  await openHome(page);
+  await keyboardSettings(page);
+  await tabTo(
+    page,
+    page.getByRole("button", { name: "Add channel", exact: true }),
+  );
+  await page.keyboard.press("Enter");
+  const added = page.getByRole("group", {
+    name: "2. New channel",
+    exact: true,
+  });
+  await expect(added.getByLabel("Label", { exact: true })).toBeFocused();
+  await replaceByKeyboard(page, "Keyboard channel");
+  await tabTo(
+    page,
+    page.getByRole("button", { name: "Move Keyboard channel up", exact: true }),
+  );
+  await page.keyboard.press("Space");
+  const moved = page.getByRole("group", {
+    name: "1. Keyboard channel",
+    exact: true,
+  });
+  await expect(moved.getByLabel("Label", { exact: true })).toBeFocused();
+  await tabTo(
+    page,
+    page.getByRole("button", { name: "Delete Keyboard channel", exact: true }),
+  );
+  await page.keyboard.press("Enter");
+  await expect(page.getByLabel("Label", { exact: true })).toBeFocused();
+  await tabTo(
+    page,
+    page.getByRole("button", { name: "Delete Japan news", exact: true }),
+  );
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("button", { name: "Add search", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("heading", { name: "Japan news" })).toBeVisible();
+});
+
+test("keyboard-only: JSON buttons can dump and open a load dialog", async ({
+  page,
+}) => {
+  await openHome(page);
+  await keyboardSettings(page);
+  await tabTo(
+    page,
+    page.getByRole("button", { name: "Dump JSON", exact: true }),
+  );
+  const downloaded = page.waitForEvent("download");
+  await page.keyboard.press("Enter");
+  const download = await downloaded;
+  const dumped = JSON.parse(await readFile((await download.path())!, "utf8"));
+  expect(dumped.apiKey).toBe("test-browser-key");
+  await page.keyboard.press("Shift+Tab");
+  await expect(
+    page.getByRole("button", { name: "Load JSON", exact: true }),
+  ).toBeFocused();
+  const choosing = page.waitForEvent("filechooser");
+  await page.keyboard.press("Space");
+  const chooser = await choosing;
+  await chooser.setFiles({
+    name: "keyboard-settings.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(dumped)),
+  });
+  await expect(page.getByRole("status")).toContainText(
+    "Loaded settings into the editor",
+  );
+  await page.keyboard.press("Control+s");
+  await expect(page).toHaveURL(/#\/$/);
+});
+
+test("keyboard-only: player controls and settings remain accessible", async ({
+  page,
+}) => {
+  await openHome(page);
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("slider", { name: "Seek" })).toBeEnabled();
+  await page.keyboard.press("Space");
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (window as any).__playerMock.calls.some(
+          (call: any) => call.command === "pause",
+        ),
+      ),
+    )
+    .toBe(true);
+  await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("button", { name: "Back to home" }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("slider", { name: "Seek" })).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("slider", { name: "Seek" })).toHaveValue("41");
+  await keyboardSettings(page);
+  await expect(page.locator("iframe")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/#\/$/);
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("slider", { name: "Seek" })).toBeEnabled();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Space");
+  await expect(page).toHaveURL(/#\/$/);
+});
+
+test("keyboard-only: player Retry activates with Space instead of toggling playback", async ({
+  page,
+}) => {
+  await openHome(page);
+  await page.route("https://www.youtube.com/iframe_api", (route) =>
+    route.fulfill({
+      contentType: "application/javascript",
+      body: playerAPIMock.replace(
+        "options.events.onReady({ target: this })",
+        "options.events.onError({ data: 100 })",
+      ),
+    }),
+  );
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("button", { name: "Retry", exact: true }),
+  ).toBeVisible();
+  await tabTo(page, page.getByRole("button", { name: "Retry", exact: true }));
+  await page.keyboard.press("Space");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as any).__playerMock.calls.filter(
+            (call: any) => call.command === "destroy",
+          ).length,
+      ),
+    )
+    .toBe(1);
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/#\/$/);
 });

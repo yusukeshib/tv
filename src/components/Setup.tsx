@@ -1,19 +1,46 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 export function Setup({
   initialKey = "",
   onSave,
   onSettings,
+  onClose,
   error,
 }: {
   initialKey?: string;
   onSave: (key: string) => void;
   onSettings: () => void;
+  onClose?: () => void;
   error?: string;
 }) {
   const [key, setKey] = useState(initialKey);
+  const form = useRef<HTMLFormElement>(null);
   return (
-    <main {...stylex.props(styles.page)}>
+    <main
+      {...stylex.props(styles.page)}
+      onKeyDown={(event) => {
+        if (
+          event.defaultPrevented ||
+          event.nativeEvent.isComposing ||
+          event.altKey ||
+          event.shiftKey
+        )
+          return;
+        if (
+          (event.ctrlKey || event.metaKey) &&
+          event.key.toLowerCase() === "s"
+        ) {
+          event.preventDefault();
+          if (!event.repeat) form.current?.requestSubmit();
+          return;
+        }
+        if (event.repeat || event.ctrlKey || event.metaKey) return;
+        if (event.key === "Escape" && onClose) {
+          event.preventDefault();
+          onClose();
+        }
+      }}
+    >
       <section {...stylex.props(styles.panel)} aria-labelledby="setup-title">
         <p {...stylex.props(styles.eyebrow)}>TV · First-time setup</p>
         <h1 id="setup-title" {...stylex.props(styles.title)}>
@@ -26,6 +53,7 @@ export function Setup({
           browser, never in the public repository.
         </p>
         <form
+          ref={form}
           onSubmit={(event) => {
             event.preventDefault();
             if (key.trim()) onSave(key.trim());
@@ -55,6 +83,7 @@ export function Setup({
           )}
           <button
             type="submit"
+            aria-keyshortcuts="Control+s Meta+s"
             disabled={!key.trim()}
             {...stylex.props(styles.button)}
           >
@@ -64,10 +93,24 @@ export function Setup({
         <button
           type="button"
           onClick={onSettings}
+          aria-keyshortcuts="Control+, Meta+,"
           {...stylex.props(styles.button)}
         >
           Open settings / Load JSON
         </button>
+        <p {...stylex.props(styles.description)}>
+          Save: Ctrl/Cmd+S · Settings: Ctrl/Cmd+,{onClose && " · Home: Esc"}
+        </p>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-keyshortcuts="Escape"
+            {...stylex.props(styles.button)}
+          >
+            Back to home
+          </button>
+        )}
         <div id="key-guidance" {...stylex.props(styles.guidance)}>
           <p>
             Enable YouTube Data API v3 in Google Cloud. Restrict your browser

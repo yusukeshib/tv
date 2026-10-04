@@ -240,6 +240,9 @@ export function Home({
     }
   }
   function navigate(event: KeyboardEvent) {
+    if (event.defaultPrevented || event.nativeEvent.isComposing) return;
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
+      return;
     if (event.target === settingsButton.current) return;
     const current = selectionRef.current;
     if (!current) return;
@@ -266,6 +269,26 @@ export function Home({
         window.scrollTo({ top: 0, behavior: "instant" });
     }
   }
+  useEffect(() => {
+    if (hidden) return;
+    const openSettings = (event: globalThis.KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        event.altKey ||
+        event.shiftKey ||
+        !(event.ctrlKey || event.metaKey) ||
+        event.key !== ","
+      )
+        return;
+      event.preventDefault();
+      rememberView();
+      onSettings();
+    };
+    window.addEventListener("keydown", openSettings, true);
+    return () => window.removeEventListener("keydown", openSettings, true);
+  });
   return (
     <main
       ref={home}
@@ -286,7 +309,8 @@ export function Home({
           ref={settingsButton}
           type="button"
           aria-label="Settings"
-          title="Settings"
+          title="Settings (Ctrl/Cmd+,)"
+          aria-keyshortcuts="Control+, Meta+,"
           {...stylex.props(styles.gear)}
           onFocus={() => {
             gearHadFocus.current = true;
@@ -313,6 +337,7 @@ export function Home({
             <circle cx="12" cy="12" r="3" />
           </svg>
         </button>
+        <span>Settings: Ctrl/Cmd+,</span>
       </div>
       {notice && (
         <p {...stylex.props(styles.notice)} role="status">

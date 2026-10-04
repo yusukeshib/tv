@@ -113,9 +113,13 @@ This is a manually maintained channel list, not a sync of your signed-in YouTube
 
 ## Controls
 
+- **Any screen:** Ctrl+, / Cmd+, opens Settings; repeating it in Settings preserves the draft. From Home, it preserves selection and scroll just like the gear.
 - **Home:** Up / Down changes rows, Left / Right selects videos, Enter plays.
-- **Player:** Left / Right seeks by 5 seconds; Space toggles playback; Escape returns home. Back and the seek bar hide after 3 seconds without input. Any key shows them immediately and restarts the timer. Mouse movement over the video cannot be detected because YouTube’s cross-origin iframe covers the screen; press a key to reveal the controls. They remain visible while loading or on an error.
-- A seek bar supports pointer input; Back to home remains available outside the player.
+- **Settings:** Tab / Shift+Tab moves between native controls; Enter / Space activates buttons and select arrows remain native. Ctrl+S / Cmd+S saves through normal form validation; Escape cancels, discards the draft, and returns Home. Invalid input or a storage failure keeps Settings open; Save is blocked while JSON loads. Load/Dump use native buttons and the browser file dialog.
+- **Setup:** Ctrl+S / Cmd+S submits the key form. Escape returns Home only when a saved key exists.
+- **Player:** Left / Right seeks by 5 seconds (Shift+Left / Right by 50 seconds); Space toggles playback; Escape returns home. Back and the seek bar hide after 3 seconds without input. Any key shows them immediately and restarts the timer. Mouse movement over the video cannot be detected because YouTube’s cross-origin iframe covers the screen; press a key to reveal the controls. They remain visible while loading or on an error.
+- Player buttons retain native Enter / Space activation; the seek bar retains native keyboard and pointer input. Tab reaches app controls without entering the YouTube frame. Ctrl/Alt/Cmd combinations and IME composition do not trigger playback or Home arrow navigation.
+- App shortcuts do not control native OS file dialogs or YouTube’s cross-origin sign-in/ad controls.
 
 The official IFrame Player API handles playback. The player fills the browser viewport edge-to-edge with a centered 16:9 embed, scaled like `cover`: wide or tall viewports crop the excess instead of shrinking the video to leave room for controls. Back and the seek bar overlay the video with subtle gradients. The embed is confined to a lower stacking layer; the seek bar uses an explicit bright track and thumb on a dark panel so it remains legible over the video. Non-16:9 source videos may still have letterboxing inside YouTube’s player. YouTube’s standard control bar is disabled; there are no fullscreen, mute, or transport-button toolbars. Chrome is already used fullscreen; the app does not request native browser fullscreen. The app retains keyboard focus after interaction with the iframe without placing a click-blocking overlay over it. It does not steal focus from another browser tab or application.
 

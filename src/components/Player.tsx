@@ -182,8 +182,21 @@ export function Player({
     else player.current.playVideo();
   };
   const handleKey = useEffectEvent((event: KeyboardEvent) => {
+    if (event.defaultPrevented || event.isComposing) return;
     showControls();
     if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const target = event.target;
+    if (
+      target instanceof HTMLInputElement &&
+      target.type === "range" &&
+      event.key !== "Escape"
+    )
+      return;
+    if (
+      target instanceof HTMLButtonElement &&
+      (event.code === "Space" || event.key === " ")
+    )
+      return;
     if (event.key === "Escape") {
       event.preventDefault();
       close.current();
@@ -216,7 +229,11 @@ export function Player({
         {...stylex.props(styles.header, !controlsShown && styles.hidden)}
         data-controls-visible={controlsShown}
       >
-        <button {...stylex.props(styles.button)} onClick={onClose}>
+        <button
+          {...stylex.props(styles.button)}
+          onClick={onClose}
+          aria-keyshortcuts="Escape"
+        >
           ← Back to home
         </button>
       </header>
@@ -256,6 +273,9 @@ export function Player({
           />
           <span {...stylex.props(styles.time)}>{timestamp(duration)}</span>
         </div>
+        <span {...stylex.props(styles.time)}>
+          Space: play/pause · ←/→: seek · Esc: Home · Ctrl/Cmd+,: Settings
+        </span>
         {!ready && !error && (
           <span {...stylex.props(styles.time)} role="status">
             Loading player…

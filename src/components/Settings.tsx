@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { parseSettings } from "../store";
 import { theme } from "../theme.stylex";
@@ -143,8 +143,53 @@ export function Settings({
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [loading, setLoading] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
+  const rowFields = useRef(new Map<string, HTMLFieldSetElement>());
+  const addSearch = useRef<HTMLButtonElement>(null);
+  const pendingFocus = useRef<{ id?: string; control?: string } | null>(null);
+  useLayoutEffect(() => {
+    const pending = pendingFocus.current;
+    if (!pending) return;
+    pendingFocus.current = null;
+    const row = pending.id ? rowFields.current.get(pending.id) : undefined;
+    const control = pending.control
+      ? row?.querySelector<HTMLButtonElement>(
+          `[data-move="${pending.control}"]:not(:disabled)`,
+        )
+      : undefined;
+    (
+      control ??
+      row?.querySelector<HTMLInputElement>("input") ??
+      addSearch.current
+    )?.focus();
+  }, [draft.rows]);
   const fileInput = useRef<HTMLInputElement>(null);
   const loadGeneration = useRef(0);
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.altKey ||
+        event.shiftKey
+      )
+        return;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        if (!event.repeat && !loading) form.current?.requestSubmit();
+      } else if (
+        !event.ctrlKey &&
+        !event.metaKey &&
+        event.key === "Escape" &&
+        !event.repeat
+      ) {
+        event.preventDefault();
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [loading, onCancel]);
   useEffect(() => {
     window.scrollTo({ top: 0 });
     return () => {
@@ -159,6 +204,7 @@ export function Settings({
     }));
   }
   function moveRow(id: string, direction: -1 | 1) {
+    pendingFocus.current = { id, control: String(direction) };
     setDraft((current) => {
       const index = current.rows.findIndex((row) => row.id === id);
       const target = index + direction;
@@ -180,6 +226,7 @@ export function Settings({
             search: { ...draft.searchDefaults, query: "" },
           }
         : { id, type, label: "New channel", channelId: "" };
+    pendingFocus.current = { id };
     setDraft((current) => ({ ...current, rows: [...current.rows, row] }));
   }
   function report(error: unknown) {
@@ -233,9 +280,11 @@ export function Settings({
   return (
     <main {...stylex.props(styles.page)}>
       <form
+        ref={form}
         {...stylex.props(styles.form)}
         onSubmit={(event) => {
           event.preventDefault();
+          if (loading) return;
           try {
             onSave(parseSettings(draft));
           } catch (error) {
@@ -248,18 +297,23 @@ export function Settings({
           <button
             type="button"
             onClick={onCancel}
+            aria-keyshortcuts="Escape"
             {...stylex.props(styles.button)}
           >
             Cancel
           </button>
           <button
             type="submit"
+            aria-keyshortcuts="Control+s Meta+s"
             disabled={loading}
             {...stylex.props(styles.button, styles.primary)}
           >
             Save settings
           </button>
         </header>
+        <p {...stylex.props(styles.description)}>
+          Save: Ctrl/Cmd+S · Cancel and discard: Esc · Settings: Ctrl/Cmd+,
+        </p>
         {error && (
           <p role="alert" {...stylex.props(styles.error)}>
             {error}
@@ -359,7 +413,14 @@ export function Settings({
             </p>
           )}
           {draft.rows.map((row, index) => (
-            <fieldset key={row.id} {...stylex.props(styles.row)}>
+            <fieldset
+              key={row.id}
+              ref={(node) => {
+                if (node) rowFields.current.set(row.id, node);
+                else rowFields.current.delete(row.id);
+              }}
+              {...stylex.props(styles.row)}
+            >
               <legend>
                 {index + 1}. {row.label || "Untitled"}
               </legend>
@@ -380,6 +441,7 @@ export function Settings({
                   type="button"
                   aria-label={`Move ${row.label || "row"} up`}
                   disabled={index === 0}
+                  data-move="-1"
                   onClick={() => moveRow(row.id, -1)}
                   {...stylex.props(styles.button)}
                 >
@@ -389,6 +451,7 @@ export function Settings({
                   type="button"
                   aria-label={`Move ${row.label || "row"} down`}
                   disabled={index === draft.rows.length - 1}
+                  data-move="1"
                   onClick={() => moveRow(row.id, 1)}
                   {...stylex.props(styles.button)}
                 >
@@ -398,14 +461,18 @@ export function Settings({
                   type="button"
                   aria-label={`Delete ${row.label || "row"}`}
                   {...stylex.props(styles.button)}
-                  onClick={() =>
+                  onClick={() => {
+                    pendingFocus.current = {
+                      id:
+                        draft.rows[index + 1]?.id ?? draft.rows[index - 1]?.id,
+                    };
                     setDraft((current) => ({
                       ...current,
                       rows: current.rows.filter(
                         (candidate) => candidate.id !== row.id,
                       ),
-                    }))
-                  }
+                    }));
+                  }}
                 >
                   Delete
                 </button>
@@ -458,6 +525,7 @@ export function Settings({
             <button
               type="button"
               disabled={draft.rows.length >= 50}
+              ref={addSearch}
               onClick={() => addRow("search")}
               {...stylex.props(styles.button)}
             >

@@ -81,6 +81,25 @@ export function App() {
     setPlaybackActive(!!video);
   }, [video]);
 
+  useEffect(() => {
+    const openSettings = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        event.altKey ||
+        event.shiftKey ||
+        !(event.ctrlKey || event.metaKey) ||
+        event.key !== ","
+      )
+        return;
+      event.preventDefault();
+      if (!settings) navigate("/settings");
+    };
+    window.addEventListener("keydown", openSettings);
+    return () => window.removeEventListener("keydown", openSettings);
+  }, [navigate, settings]);
+
   const saveKey = (next: string) => {
     try {
       store.setKey(next);
@@ -100,6 +119,7 @@ export function App() {
         onSave={saveKey}
         error={setupError}
         onSettings={() => navigate("/settings")}
+        onClose={hasKey ? () => navigate("/", { replace: true }) : undefined}
       />
     );
   const rows: DisplayRow[] = snapshot.config.rows.map((row) => ({
