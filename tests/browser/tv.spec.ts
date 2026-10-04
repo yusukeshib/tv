@@ -96,6 +96,49 @@ async function openHome(page: Page, homeConfig: unknown = config) {
       );
   });
 }
+test("watch history survives reload and removal of the source row", async ({
+  page,
+}) => {
+  await openHome(page);
+  await page
+    .getByRole("button", { name: /News story 1,/ })
+    .first()
+    .click();
+  await expect(page.getByRole("button", { name: "Back" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem("tv.snapshot.v1")!).history?.length,
+      ),
+    )
+    .toBe(1);
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("heading", { name: "Recently watched" }),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem("tv.snapshot.v1")!);
+    saved.localConfig = true;
+    saved.config.rows = [];
+    saved.rows = {};
+    localStorage.setItem("tv.snapshot.v1", JSON.stringify(saved));
+  });
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Recently watched" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /News story 1,/ }).click();
+  await expect(page.getByRole("button", { name: "Back" })).toBeVisible();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Space");
+  expect(
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem("tv.snapshot.v1")!).history.length,
+    ),
+  ).toBe(1);
+});
+
 test.beforeEach(async ({ request }) => {
   await request.post("/__test/version?value=base");
 });
@@ -454,9 +497,11 @@ test("app updates wait for playback to close, then reload exactly once", async (
 }) => {
   await openHome(page);
   await page.getByRole("button", { name: /News story 1,/ }).click();
+  await expect(page.locator("iframe")).toBeVisible();
   let navigations = 0;
-  page.on("framenavigated", (frame) => {
-    if (frame === page.mainFrame()) navigations++;
+  page.on("request", (request) => {
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame())
+      navigations++;
   });
   await request.post("/__test/version?value=next");
   await page.evaluate(async () => {
@@ -525,7 +570,7 @@ for (const selectedRow of ["row0", "row1"]) {
           ].map((track) => track.scrollLeft),
         })),
       )
-      .toEqual(before);
+      .toEqual({ ...before, tracks: [...before.tracks, 0] });
     await page.goForward();
     await expect(page.locator("iframe")).toBeVisible();
     await page.keyboard.press("Escape");
@@ -539,7 +584,7 @@ for (const selectedRow of ["row0", "row1"]) {
           ].map((track) => track.scrollLeft),
         })),
       )
-      .toEqual(before);
+      .toEqual({ ...before, tracks: [...before.tracks, 0] });
   });
 }
 

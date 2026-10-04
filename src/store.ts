@@ -6,6 +6,7 @@ import type {
   SearchOptions,
   SettingsData,
   Video,
+  WatchEntry,
 } from "./types";
 import { DEFAULT_MIN_DURATION_SECONDS, DEFAULT_SEARCH_OPTIONS } from "./types";
 
@@ -183,6 +184,28 @@ function readRow(
   };
 }
 
+function readHistory(value: unknown, now: number): WatchEntry[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  return value
+    .filter(
+      (entry): entry is WatchEntry =>
+        object(entry) &&
+        isVideo(entry.video) &&
+        typeof entry.watchedAt === "number" &&
+        Number.isFinite(entry.watchedAt) &&
+        entry.watchedAt <= now + 60_000 &&
+        now - entry.watchedAt < RETENTION_MS,
+    )
+    .sort((a, b) => b.watchedAt - a.watchedAt)
+    .filter(({ video }) => {
+      if (seen.has(video.id)) return false;
+      seen.add(video.id);
+      return true;
+    })
+    .slice(0, 100);
+}
+
 export function readSnapshot(
   storage: Pick<Storage, "getItem">,
   now = Date.now(),
@@ -202,6 +225,9 @@ export function readSnapshot(
       version: 1,
       config,
       rows,
+      ...(Array.isArray(raw.history)
+        ? { history: readHistory(raw.history, now) }
+        : {}),
       ...(typeof raw.apiKey === "string" ? { apiKey: raw.apiKey } : {}),
       ...(raw.localConfig === true ? { localConfig: true } : {}),
     };
@@ -257,6 +283,19 @@ export function createStore(storage: Storage) {
       if (!text(key)) throw new Error("Enter your API key.");
       this.save({ ...snapshot, apiKey: key.trim() });
     },
+    recordWatch(video: Video, now = Date.now()) {
+      if (!isVideo(video)) throw new Error("Invalid history video.");
+      const history = readHistory(
+        [
+          { video, watchedAt: now },
+          ...(snapshot.history ?? []).filter(
+            (entry) => entry.video.id !== video.id,
+          ),
+        ],
+        now,
+      );
+      this.save({ ...snapshot, history });
+    },
     saveSettings(value: unknown) {
       const { apiKey, ...config } = parseSettings(value);
       const rows: Snapshot["rows"] = {};
@@ -265,7 +304,14 @@ export function createStore(storage: Storage) {
         if (cached?.definitionKey === definitionKey(row)) rows[row.id] = cached;
       }
       // One write commits the key, defaults, list and ownership together.
-      this.save({ version: 1, apiKey, localConfig: true, config, rows });
+      this.save({
+        ...snapshot,
+        version: 1,
+        apiKey,
+        localConfig: true,
+        config,
+        rows,
+      });
     },
     prune(now = Date.now()) {
       const rows = Object.fromEntries(
@@ -273,8 +319,16 @@ export function createStore(storage: Storage) {
           ([, row]) => now - row.updatedAt < RETENTION_MS,
         ),
       );
-      if (Object.keys(rows).length !== Object.keys(snapshot.rows).length)
-        this.save({ ...snapshot, rows });
+      const history = readHistory(snapshot.history, now);
+      if (
+        Object.keys(rows).length !== Object.keys(snapshot.rows).length ||
+        history.length !== (snapshot.history?.length ?? 0)
+      )
+        this.save({
+          ...snapshot,
+          rows,
+          ...(snapshot.history ? { history } : {}),
+        });
     },
   };
 }

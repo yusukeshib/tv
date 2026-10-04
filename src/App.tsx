@@ -51,9 +51,11 @@ export function App() {
   const setup = location.pathname === "/setup";
   const settings = location.pathname === "/settings";
   const watch = useMatch("/watch/:videoId");
-  const video = Object.values(snapshot.rows)
-    .flatMap((row) => row.videos)
-    .find((candidate) => candidate.id === watch?.params.videoId);
+  const video = [
+    ...Object.values(snapshot.rows).flatMap((row) => row.videos),
+    ...(snapshot.history ?? []).map((entry) => entry.video),
+  ].find((candidate) => candidate.id === watch?.params.videoId);
+  const [historyError, setHistoryError] = useState<string>();
   const [setupError, setSetupError] = useState<string>();
   const closePlayer = () => {
     if (location.state?.fromHome) navigate(-1);
@@ -128,6 +130,13 @@ export function App() {
     videos: snapshot.rows[row.id]?.videos || [],
     hasMore: !!snapshot.rows[row.id]?.nextPageToken,
   }));
+  if (snapshot.history?.length)
+    rows.push({
+      id: ":history",
+      label: "Recently watched",
+      videos: snapshot.history.map((entry) => entry.video),
+      hasMore: false,
+    });
   return (
     <>
       <Home
@@ -142,7 +151,7 @@ export function App() {
         }}
         onSettings={() => navigate("/settings")}
         loadingRows={status.loadingRows}
-        notice={status.notice}
+        notice={historyError || status.notice}
         hidden={location.pathname !== "/"}
       />
       <Routes>
@@ -166,7 +175,22 @@ export function App() {
           path="/watch/:videoId"
           element={
             video ? (
-              <Player video={video} onClose={closePlayer} />
+              <Player
+                video={video}
+                onClose={closePlayer}
+                onPlayed={(played) => {
+                  try {
+                    store.recordWatch(played);
+                    setHistoryError(undefined);
+                  } catch (error) {
+                    setHistoryError(
+                      error instanceof Error
+                        ? error.message
+                        : "Could not save watch history.",
+                    );
+                  }
+                }}
+              />
             ) : (
               <main>
                 <p role="status">

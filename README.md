@@ -101,7 +101,7 @@ Home excludes videos shorter than four minutes by default, including on channel 
 
 The bundled config uses five specific channels (BBC News, Reuters, Marques Brownlee, Veritasium, and NASA) rather than broad keyword searches. The search example above retrieves the most-viewed candidates published in the past seven days, then displays those candidates newest first. This does not guarantee editorial quality or represent every video published in that time range. Loading additional pages fetches more candidates using the same settings and re-sorts the retrieved set by publication time.
 
-Navigation uses React Router hash routes so GitHub Pages needs no server rewrite rules: `#/` for Home, `#/settings` for settings, `#/watch/:videoId` for playback, and `#/setup` for setup (`#setup` links remain supported). Browser Back/Forward and the player's Back/Escape restore Home's vertical and per-row horizontal scroll. Playback URLs resolve metadata from the saved library; unavailable videos show a Home link rather than fetching arbitrary provider metadata. URLs never include API keys.
+Navigation uses React Router hash routes so GitHub Pages needs no server rewrite rules: `#/` for Home, `#/settings` for settings, `#/watch/:videoId` for playback, and `#/setup` for setup (`#setup` links remain supported). Browser Back/Forward and the player's Back/Escape restore Home's vertical and per-row horizontal scroll. Playback URLs resolve metadata from the saved library or app watch history; unavailable videos show a Home link rather than fetching arbitrary provider metadata. URLs never include API keys.
 
 Home keyboard scrolling is axis-specific: Left/Right reveal the selected card within that row without changing vertical scroll; Up/Down reveal the row heading and cards with focus-ring clearance. Navigating to the first selectable row resets vertical scroll to zero. Playback/history/reload restoration takes priority over that rule, preserving the exact saved offsets. Background updates retain the selected video and do not override manual scrolling.
 
@@ -110,6 +110,10 @@ Changing any row’s retrieval setting invalidates that row’s cached results a
 Before the first local settings save, the deployed browser reads the **raw GitHub defaults**, not the cached Pages app, every minute while visible. The development server reads the local `public/config.json` instead. GitHub/CDN delays can still affect freshness. Invalid defaults leave the previous valid config in place. Once settings are saved locally, remote defaults reads stop; video and app refreshes continue.
 
 This is a manually maintained channel list, not a sync of your signed-in YouTube subscriptions or personalized recommendations. No Google sign-in is required by this app. The official player may separately ask you to sign in for some content.
+
+## Watch history
+
+Home shows a **Recently watched** row after a video starts playing in this app. Rewatching moves the video to the front without duplicates; opening a player that never starts does not add an entry. History is saved only in this browser's localStorage, with the latest 100 videos retained for up to 29 days. It survives settings changes and removal of the original Home row, but is not included in settings Load/Dump or synced with YouTube or other devices. Clearing site data also clears history. Playback starts from the beginning; resume positions are not saved.
 
 ## Controls
 

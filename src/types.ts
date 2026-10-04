@@ -57,12 +57,18 @@ export interface CachedRow extends VideoPage {
   updatedAt: number;
 }
 
+export interface WatchEntry {
+  video: Video;
+  watchedAt: number;
+}
+
 export interface Snapshot {
   version: 1;
   apiKey?: string;
   localConfig?: boolean;
   config: Config;
   rows: Record<string, CachedRow>;
+  history?: WatchEntry[];
 }
 
 export interface DisplayRow {

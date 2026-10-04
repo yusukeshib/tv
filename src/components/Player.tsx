@@ -15,9 +15,11 @@ function timestamp(seconds: number): string {
 export function Player({
   video,
   onClose,
+  onPlayed,
 }: {
   video: Video;
   onClose: () => void;
+  onPlayed: (video: Video) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const overlay = useRef<HTMLDivElement>(null);
@@ -28,6 +30,7 @@ export function Player({
   const pendingSeek = useRef<number | null>(null);
   const close = useRef(onClose);
   close.current = onClose;
+  const played = useEffectEvent(() => onPlayed(video));
   const [attempt, setAttempt] = useState(0);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string>();
@@ -82,6 +85,7 @@ export function Player({
 
   useEffect(() => {
     let disposed = false;
+    let recorded = false;
     let instance: YouTubePlayer | undefined;
     let timer: ReturnType<typeof setInterval> | undefined;
     setReady(false);
@@ -122,8 +126,13 @@ export function Player({
               timer = setInterval(update, 500);
               active.playVideo();
             },
-            onStateChange: () => {
-              if (!disposed) update();
+            onStateChange: ({ data }) => {
+              if (disposed) return;
+              update();
+              if (data === 1 && !recorded) {
+                recorded = true;
+                played();
+              }
             },
             onAutoplayBlocked: () => {},
 
