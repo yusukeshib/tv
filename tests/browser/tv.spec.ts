@@ -126,6 +126,9 @@ test("keyboard selection plays and returns to the same card; only the settings g
   await openHome(page);
   await expect(page.getByRole("search")).toHaveCount(0);
   await expect(
+    page.getByText("Settings: Ctrl/Cmd+,", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
     page.getByText("1.2M views", { exact: true }).first(),
   ).toBeVisible();
   await page.getByRole("button", { name: /News story 1,/ }).focus();
@@ -706,12 +709,12 @@ test("new and legacy setup routes remain available", async ({ page }) => {
   }
 });
 
-test("compact rows keep six cards visible and the selected ring inside the gutter", async ({
+test("responsive rows preserve card size and fit as many cards as the viewport allows", async ({
   page,
 }) => {
   await openHome(page);
   await expect(page.getByText("TV YouTube", { exact: true })).toHaveCount(0);
-  for (const width of [1920, 1786, 1280]) {
+  for (const width of [2560, 1920, 1786, 1280, 900, 600, 320]) {
     await page.setViewportSize({ width, height: 1080 });
     const track = page.locator('[data-row-scroll="news"]');
     const cards = track.getByRole("button");
@@ -720,14 +723,26 @@ test("compact rows keep six cards visible and the selected ring inside the gutte
       .getByRole("heading", { name: "Japan news" })
       .boundingBox();
     const first = (await cards.nth(0).boundingBox())!;
-    const sixth = (await cards.nth(5).boundingBox())!;
-    expect(Math.abs(first.width - (width - 96 - 5 * 24) / 6)).toBeLessThan(1);
+    const gutter = width <= 900 ? 24 : 48;
+    const gap = width <= 900 ? 16 : 24;
+    const available = width - 2 * gutter;
+    const cardWidth = Math.min(284, available);
+    const visibleCount = Math.floor((available + gap) / (cardWidth + gap));
+    const lastVisible = (await cards.nth(visibleCount - 1).boundingBox())!;
+    const next = (await cards.nth(visibleCount).boundingBox())!;
+    expect(Math.abs(first.width - cardWidth)).toBeLessThan(1);
+    const image = (await cards.first().locator("img").boundingBox())!;
+    expect(Math.abs(image.width / image.height - 16 / 9)).toBeLessThan(0.01);
     const bounds = (await track.boundingBox())!;
     expect(Math.abs(first.x - heading!.x)).toBeLessThan(2);
     expect(first.x - 8).toBeGreaterThanOrEqual(bounds.x);
-    expect(sixth.x + sixth.width + 8).toBeLessThanOrEqual(
+    expect(lastVisible.x + lastVisible.width + 8).toBeLessThanOrEqual(
       bounds.x + bounds.width + 1,
     );
+    expect(next.x + next.width).toBeGreaterThan(first.x + available);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width);
     await expect(cards.first()).toHaveCSS("outline-width", "6px");
     await expect(cards.first()).toHaveCSS(
       "outline-color",

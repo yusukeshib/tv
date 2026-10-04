@@ -337,7 +337,6 @@ export function Home({
             <circle cx="12" cy="12" r="3" />
           </svg>
         </button>
-        <span>Settings: Ctrl/Cmd+,</span>
       </div>
       {notice && (
         <p {...stylex.props(styles.notice)} role="status">

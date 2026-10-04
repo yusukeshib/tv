@@ -55,10 +55,8 @@ export function VideoCard({
 }
 const styles = stylex.create({
   card: {
-    width: {
-      default: `calc((100% - 5 * ${theme.cardGap}) / 6)`,
-      "@media (max-width: 900px)": "calc((100% - 16px) / 2)",
-    },
+    width: 284,
+    maxWidth: "100%",
     flexShrink: 0,
     display: "flex",
     flexDirection: "column",
