@@ -139,6 +139,34 @@ test("watch history survives reload and removal of the source row", async ({
   ).toBe(1);
 });
 
+test("screens do not display keyboard shortcut instructions", async ({
+  page,
+}) => {
+  await openHome(page);
+  const instructions = page.getByText(
+    /Ctrl\/Cmd|Space: play\/pause|Save:.*Esc/,
+  );
+  await expect(instructions).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Settings", exact: true }),
+  ).not.toHaveAttribute("title", /Ctrl|Cmd/);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Settings", exact: true }),
+  ).toBeVisible();
+  await expect(instructions).toHaveCount(0);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page
+    .getByRole("button", { name: /News story 1,/ })
+    .first()
+    .click();
+  await expect(page.locator("iframe")).toBeVisible();
+  await expect(instructions).toHaveCount(0);
+  await page.goto("./#/setup");
+  await expect(page.getByLabel("API key", { exact: true })).toBeVisible();
+  await expect(instructions).toHaveCount(0);
+});
+
 test.beforeEach(async ({ request }) => {
   await request.post("/__test/version?value=base");
 });

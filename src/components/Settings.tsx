@@ -311,9 +311,6 @@ export function Settings({
             Save settings
           </button>
         </header>
-        <p {...stylex.props(styles.description)}>
-          Save: Ctrl/Cmd+S · Cancel and discard: Esc · Settings: Ctrl/Cmd+,
-        </p>
         {error && (
           <p role="alert" {...stylex.props(styles.error)}>
             {error}

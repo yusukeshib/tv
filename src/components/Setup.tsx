@@ -98,9 +98,6 @@ export function Setup({
         >
           Open settings / Load JSON
         </button>
-        <p {...stylex.props(styles.description)}>
-          Save: Ctrl/Cmd+S · Settings: Ctrl/Cmd+,{onClose && " · Home: Esc"}
-        </p>
         {onClose && (
           <button
             type="button"

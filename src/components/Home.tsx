@@ -309,7 +309,6 @@ export function Home({
           ref={settingsButton}
           type="button"
           aria-label="Settings"
-          title="Settings (Ctrl/Cmd+,)"
           aria-keyshortcuts="Control+, Meta+,"
           {...stylex.props(styles.gear)}
           onFocus={() => {

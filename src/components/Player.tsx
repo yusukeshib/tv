@@ -282,9 +282,6 @@ export function Player({
           />
           <span {...stylex.props(styles.time)}>{timestamp(duration)}</span>
         </div>
-        <span {...stylex.props(styles.time)}>
-          Space: play/pause · ←/→: seek · Esc: Home · Ctrl/Cmd+,: Settings
-        </span>
         {!ready && !error && (
           <span {...stylex.props(styles.time)} role="status">
             Loading player…
