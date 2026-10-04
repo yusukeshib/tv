@@ -706,7 +706,7 @@ test("new and legacy setup routes remain available", async ({ page }) => {
   }
 });
 
-test("compact rows keep five cards visible and the selected ring inside the gutter", async ({
+test("compact rows keep six cards visible and the selected ring inside the gutter", async ({
   page,
 }) => {
   await openHome(page);
@@ -720,11 +720,12 @@ test("compact rows keep five cards visible and the selected ring inside the gutt
       .getByRole("heading", { name: "Japan news" })
       .boundingBox();
     const first = (await cards.nth(0).boundingBox())!;
-    const fifth = (await cards.nth(4).boundingBox())!;
+    const sixth = (await cards.nth(5).boundingBox())!;
+    expect(Math.abs(first.width - (width - 96 - 5 * 24) / 6)).toBeLessThan(1);
     const bounds = (await track.boundingBox())!;
     expect(Math.abs(first.x - heading!.x)).toBeLessThan(2);
     expect(first.x - 8).toBeGreaterThanOrEqual(bounds.x);
-    expect(fifth.x + fifth.width + 8).toBeLessThanOrEqual(
+    expect(sixth.x + sixth.width + 8).toBeLessThanOrEqual(
       bounds.x + bounds.width + 1,
     );
     await expect(cards.first()).toHaveCSS("outline-width", "6px");
