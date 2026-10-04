@@ -316,7 +316,7 @@ test("player: seekbar stays above the iframe and supports pointer seeking", asyn
   ).toBeFocused();
 });
 
-test("player: video covers the full viewport with controls overlaid at every aspect ratio", async ({
+test("player: video fits within the viewport with controls overlaid at every aspect ratio", async ({
   page,
 }) => {
   await openHome(page);
@@ -336,10 +336,16 @@ test("player: video covers the full viewport with controls overlaid at every asp
     const overlay = (await page.getByRole("dialog").boundingBox())!;
     const video = (await frame.boundingBox())!;
     expect(overlay).toEqual({ x: 0, y: 0, ...viewport });
-    expect(video.x).toBeLessThanOrEqual(1);
-    expect(video.y).toBeLessThanOrEqual(1);
-    expect(video.x + video.width).toBeGreaterThanOrEqual(viewport.width - 1);
-    expect(video.y + video.height).toBeGreaterThanOrEqual(viewport.height - 1);
+    expect(video.x).toBeGreaterThanOrEqual(-1);
+    expect(video.y).toBeGreaterThanOrEqual(-1);
+    expect(video.x + video.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(video.y + video.height).toBeLessThanOrEqual(viewport.height + 1);
+    expect(
+      Math.min(
+        Math.abs(video.width - viewport.width),
+        Math.abs(video.height - viewport.height),
+      ),
+    ).toBeLessThan(1);
     expect(Math.abs(video.width / video.height - 16 / 9)).toBeLessThan(0.001);
     expect(
       Math.abs(video.x + video.width / 2 - viewport.width / 2),

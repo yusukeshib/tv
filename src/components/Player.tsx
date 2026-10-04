@@ -152,7 +152,7 @@ export function Player({
         frame.tabIndex = -1;
         frame.referrerPolicy = "strict-origin-when-cross-origin";
         frame.style.cssText =
-          "position:absolute;left:50%;top:50%;width:max(100vw,177.777778vh);height:max(100vh,56.25vw);transform:translate(-50%,-50%);border:0;display:block";
+          "position:absolute;left:50%;top:50%;width:min(100vw,177.777778vh);height:min(100vh,56.25vw);transform:translate(-50%,-50%);border:0;display:block";
       })
       .catch((failure: unknown) => {
         if (!disposed)
