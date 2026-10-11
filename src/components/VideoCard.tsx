@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { Text } from "@radix-ui/themes";
+import { Card, Flex, Inset, Text } from "@radix-ui/themes";
 import type { Video } from "../types";
 import { theme } from "../theme.stylex";
 import { formatViews } from "../formatViews";
@@ -20,44 +20,47 @@ export function VideoCard({
 }: Props) {
   const date = new Date(video.publishedAt);
   return (
-    <button
-      ref={buttonRef}
-      {...stylex.props(styles.card, active && styles.active)}
-      tabIndex={active ? 0 : -1}
-      onFocus={onFocus}
-      onClick={onPlay}
-      aria-label={`${video.title}, ${video.channelTitle}`}
-    >
-      <div {...stylex.props(styles.imageWrap)}>
-        <img
-          {...stylex.props(styles.image)}
-          src={video.thumbnail}
-          alt=""
-          loading="lazy"
-          crossOrigin="anonymous"
-        />
-      </div>
-      <div {...stylex.props(styles.content)}>
-        <Text size="3" weight="medium" {...stylex.props(styles.title)}>
-          {video.title}
-        </Text>
-        <Text size="2" color="gray" {...stylex.props(styles.channel)}>
-          {video.channelTitle}
-        </Text>
-        <div {...stylex.props(styles.meta, styles.details)}>
-          <Text size="2" color="gray">
-            {formatViews(video.viewCount)}
+    <Card size="2" variant="surface" asChild>
+      <button
+        type="button"
+        ref={buttonRef}
+        {...stylex.props(styles.card, active && styles.active)}
+        tabIndex={active ? 0 : -1}
+        onFocus={onFocus}
+        onClick={onPlay}
+        aria-label={`${video.title}, ${video.channelTitle}`}
+      >
+        <Inset side="top" clip="padding-box" pb="current">
+          <img
+            {...stylex.props(styles.image)}
+            src={video.thumbnail}
+            alt=""
+            loading="lazy"
+            crossOrigin="anonymous"
+          />
+        </Inset>
+        <Flex as="span" direction="column" gap="2">
+          <Text size="3" weight="medium" {...stylex.props(styles.title)}>
+            {video.title}
           </Text>
-          {!Number.isNaN(date.getTime()) && (
-            <Text size="2" color="gray" asChild>
-              <time dateTime={video.publishedAt}>
-                {date.toLocaleDateString("en-US")}
-              </time>
+          <Text size="2" color="gray" {...stylex.props(styles.channel)}>
+            {video.channelTitle}
+          </Text>
+          <Flex as="span" gap="2" justify="between" wrap="nowrap">
+            <Text size="2" color="gray">
+              {formatViews(video.viewCount)}
             </Text>
-          )}
-        </div>
-      </div>
-    </button>
+            {!Number.isNaN(date.getTime()) && (
+              <Text size="2" color="gray" asChild>
+                <time dateTime={video.publishedAt}>
+                  {date.toLocaleDateString("en-US")}
+                </time>
+              </Text>
+            )}
+          </Flex>
+        </Flex>
+      </button>
+    </Card>
   );
 }
 const styles = stylex.create({
@@ -65,44 +68,20 @@ const styles = stylex.create({
     width: 284,
     maxWidth: "100%",
     flexShrink: 0,
-    display: "flex",
-    flexDirection: "column",
-    padding: 0,
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: theme.outlineVariant,
-    boxShadow: "none",
-    appearance: "none",
-    backgroundColor: theme.surface,
-    color: theme.onSurface,
-    textAlign: "left",
     cursor: "pointer",
-    borderRadius: theme.radius,
-    outline: "none",
+    // The TV selection ring replaces Card's inset keyboard-focus outline.
+    outline: { default: "none", "::after": "none" },
     outlineOffset: 4,
   },
   active: {
-    outline: `6px solid ${theme.focus}`,
-    backgroundColor: theme.surfaceContainerLow,
-  },
-  imageWrap: {
-    aspectRatio: "16 / 9",
-    overflow: "hidden",
-    borderTopLeftRadius: theme.radius,
-    borderTopRightRadius: theme.radius,
-    backgroundColor: theme.surfaceContainerLow,
+    outline: { default: `6px solid ${theme.focus}`, "::after": "none" },
   },
   image: {
     width: "100%",
-    height: "100%",
+    aspectRatio: "16 / 9",
     objectFit: "cover",
     display: "block",
-  },
-  content: {
-    padding: theme.cardInset,
-    display: "flex",
-    flexDirection: "column",
-    gap: "var(--space-2)",
+    backgroundColor: theme.surfaceContainerLow,
   },
   title: {
     display: "-webkit-box",
@@ -111,12 +90,6 @@ const styles = stylex.create({
     overflow: "hidden",
     minHeight: `calc(2 * ${theme.titleMediumLine})`,
   },
-  meta: {
-    display: "flex",
-    gap: 8,
-    whiteSpace: "nowrap",
-  },
-  details: { justifyContent: "space-between" },
   channel: {
     display: "block",
     overflow: "hidden",

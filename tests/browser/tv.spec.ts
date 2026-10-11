@@ -113,7 +113,7 @@ async function openHome(page: Page, homeConfig: unknown = config) {
       );
   });
 }
-test("Radix Themes covers every screen and custom TV cards inherit its tokens", async ({
+test("Radix Themes covers every screen and TV cards inherit its tokens", async ({
   page,
 }) => {
   await openHome(page);
@@ -122,17 +122,48 @@ test("Radix Themes covers every screen and custom TV cards inherit its tokens", 
   await expect(themeRoot).toHaveClass(/dark/);
   const card = page.getByRole("button", { name: /News story 1,/ }).first();
   await card.focus();
-  await themeRoot.evaluate((root) =>
-    (root as HTMLElement).style.setProperty("--gray-3", "rgb(31, 42, 53)"),
-  );
-  await expect(card).toHaveCSS("background-color", "rgb(31, 42, 53)");
-  await themeRoot.evaluate((root) =>
-    (root as HTMLElement).style.removeProperty("--gray-3"),
-  );
-  await expect(card).toHaveCSS(
-    "background-color",
-    await radixColor(page, "--gray-3"),
-  );
+  await expect(card).toHaveClass(/\brt-Card\b/);
+  await expect(card).toHaveAttribute("type", "button");
+  expect(
+    await card.evaluate((node) =>
+      node.parentElement?.getAttribute("data-row-scroll"),
+    ),
+  ).toBe("news");
+  await expect(card.locator("button")).toHaveCount(0);
+  await expect(card.locator(".rt-Inset img")).toHaveCount(1);
+  await expect(card).toHaveCSS("padding-left", "16px");
+  await themeRoot.evaluate((root) => {
+    (root as HTMLElement).style.setProperty(
+      "--color-panel-solid",
+      "rgb(31, 42, 53)",
+    );
+    (root as HTMLElement).style.setProperty("--radius-4", "19px");
+  });
+  await expect
+    .poll(() =>
+      card.evaluate(
+        (node) => getComputedStyle(node, "::before").backgroundColor,
+      ),
+    )
+    .toBe("rgb(31, 42, 53)");
+  await expect(card).toHaveCSS("border-top-left-radius", "19px");
+  await themeRoot.evaluate((root) => {
+    (root as HTMLElement).style.removeProperty("--color-panel-solid");
+    (root as HTMLElement).style.removeProperty("--radius-4");
+  });
+  await expect
+    .poll(() =>
+      card.evaluate(
+        (node) => getComputedStyle(node, "::before").backgroundColor,
+      ),
+    )
+    .toBe(await radixColor(page, "--color-panel-solid"));
+  await expect(card).toHaveCSS("outline-width", "6px");
+  expect(
+    await card.evaluate(
+      (node) => getComputedStyle(node, "::after").outlineStyle,
+    ),
+  ).toBe("none");
   await expect(card.locator(".rt-Text")).not.toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Japan news" })).toHaveClass(
     /rt-Heading/,
@@ -379,21 +410,34 @@ test("keyboard selection plays and returns to the same card; only the settings g
     .getByRole("button", { name: /News story 2,/ });
   await expect(second).toBeFocused();
   await expect(second).toHaveCSS("outline-width", "6px");
-  await expect(second).toHaveCSS(
-    "background-color",
-    await radixColor(page, "--gray-3"),
-  );
+  await expect(second).toHaveClass(/\brt-Card\b/);
+  await expect
+    .poll(() =>
+      second.evaluate(
+        (node) => getComputedStyle(node, "::before").backgroundColor,
+      ),
+    )
+    .toBe(await radixColor(page, "--color-panel-solid"));
   const unselected = page.getByRole("button", { name: /News story 1,/ });
   await expect(unselected).toHaveCSS("outline-style", "none");
-  await expect(unselected).toHaveCSS("border-top-width", "1px");
-  await expect(unselected).toHaveCSS(
-    "border-top-color",
-    await radixColor(page, "--gray-6"),
-  );
-  await expect(unselected).toHaveCSS(
-    "background-color",
-    await radixColor(page, "--color-background"),
-  );
+  // Radix paints the surface and border with pseudo-elements, not a native border.
+  await expect(unselected).toHaveCSS("border-top-width", "0px");
+  expect(
+    await unselected.evaluate(
+      (node) => getComputedStyle(node, "::after").boxShadow,
+    ),
+  ).not.toBe("none");
+  await expect
+    .poll(() =>
+      unselected.evaluate(
+        (node) => getComputedStyle(node, "::before").backgroundColor,
+      ),
+    )
+    .toBe(await radixColor(page, "--color-panel-solid"));
+  await unselected.hover();
+  await expect(unselected).toHaveCSS("outline-style", "none");
+  await expect(second).toBeFocused();
+  await expect(second).toHaveCSS("outline-width", "6px");
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/#\/watch\/video000001$/);
   await expect(page.locator("iframe")).toHaveAttribute(
