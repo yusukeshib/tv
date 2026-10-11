@@ -518,6 +518,47 @@ test("player: controls auto-hide after three seconds and reappear immediately on
   ).toBeFocused();
 });
 
+test("player: pointer activity reveals controls and restarts the same idle timer", async ({
+  page,
+}) => {
+  // Use a wide viewport so real pointer events can target the app-owned margin.
+  await page.setViewportSize({ width: 2000, height: 700 });
+  await openHome(page);
+  await page.clock.install();
+  await page
+    .getByRole("button", { name: /News story 1,/ })
+    .first()
+    .click();
+  const seek = page.getByRole("slider", { name: "Seek" });
+  const back = page.getByRole("button", { name: "Back to home" });
+  await expect(seek).toBeEnabled();
+  const calls = await page.evaluate("window.__playerMock.calls");
+  await page.clock.runFor(3_000);
+  await expect(seek).toBeHidden();
+
+  await page.mouse.move(40, 350);
+  await expect(seek).toBeVisible();
+  await expect(back).toBeVisible();
+  await page.clock.runFor(2_000);
+  await page.mouse.move(80, 350);
+  await page.clock.runFor(2_999);
+  await expect(seek).toBeVisible();
+  await page.clock.runFor(1);
+  await expect(seek).toBeHidden();
+  await expect(back).toBeHidden();
+
+  // A press without moving the pointer also counts as activity.
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(seek).toBeVisible();
+  await expect(back).toBeVisible();
+  expect(await page.evaluate("window.__playerMock.calls")).toEqual(calls);
+  await page.clock.runFor(3_000);
+  await expect(seek).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/#\/$/);
+});
+
 test("player: seekbar stays above the iframe and supports pointer seeking", async ({
   page,
 }) => {

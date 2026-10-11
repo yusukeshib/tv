@@ -232,6 +232,8 @@ export function Player({
       role="dialog"
       aria-modal="true"
       aria-label={video.title}
+      onPointerMove={showControls}
+      onPointerDown={showControls}
       onFocusCapture={(event) => {
         if (event.target !== event.currentTarget) showControls();
       }}
