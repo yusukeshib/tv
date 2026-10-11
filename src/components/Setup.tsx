@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
+import { Button, Callout, Heading, Text, TextField } from "@radix-ui/themes";
 export function Setup({
   initialKey = "",
   onSave,
@@ -42,16 +43,18 @@ export function Setup({
       }}
     >
       <section {...stylex.props(styles.panel)} aria-labelledby="setup-title">
-        <p {...stylex.props(styles.eyebrow)}>TV · First-time setup</p>
-        <h1 id="setup-title" {...stylex.props(styles.title)}>
+        <Text as="p" size="3" color="gray">
+          TV · First-time setup
+        </Text>
+        <Heading as="h1" size={{ initial: "7", sm: "9" }} id="setup-title">
           Your favorite videos,
           <br />
           on the big screen.
-        </h1>
-        <p {...stylex.props(styles.description)}>
+        </Heading>
+        <Text as="p" size={{ initial: "4", sm: "5" }} color="gray">
           Enter your YouTube Data API key. It is saved only in this device’s
           browser, never in the public repository.
-        </p>
+        </Text>
         <form
           ref={form}
           onSubmit={(event) => {
@@ -60,10 +63,11 @@ export function Setup({
           }}
           {...stylex.props(styles.form)}
         >
-          <label htmlFor="api-key" {...stylex.props(styles.label)}>
-            API key
-          </label>
-          <input
+          <Text asChild size="4" weight="medium">
+            <label htmlFor="api-key">API key</label>
+          </Text>
+          <TextField.Root
+            size="3"
             id="api-key"
             autoFocus
             type="password"
@@ -71,53 +75,58 @@ export function Setup({
             spellCheck={false}
             value={key}
             onChange={(event) => setKey(event.target.value)}
-            {...stylex.props(styles.input)}
             aria-describedby="key-guidance"
             aria-invalid={Boolean(error)}
             required
           />
           {error && (
-            <p role="alert" {...stylex.props(styles.error)}>
-              {error}
-            </p>
+            <Callout.Root role="alert" color="red">
+              <Callout.Text>{error}</Callout.Text>
+            </Callout.Root>
           )}
-          <button
+          <Button
+            size="3"
+            variant="solid"
             type="submit"
             aria-keyshortcuts="Control+s Meta+s"
             disabled={!key.trim()}
-            {...stylex.props(styles.button)}
+            {...stylex.props(styles.action)}
           >
             Save and start →
-          </button>
+          </Button>
         </form>
-        <button
+        <Button
+          size="3"
+          variant="soft"
           type="button"
           onClick={onSettings}
           aria-keyshortcuts="Control+, Meta+,"
-          {...stylex.props(styles.button)}
+          {...stylex.props(styles.action)}
         >
           Open settings / Load JSON
-        </button>
+        </Button>
         {onClose && (
-          <button
+          <Button
+            size="3"
+            variant="soft"
             type="button"
             onClick={onClose}
             aria-keyshortcuts="Escape"
-            {...stylex.props(styles.button)}
+            {...stylex.props(styles.action)}
           >
             Back to home
-          </button>
+          </Button>
         )}
         <div id="key-guidance" {...stylex.props(styles.guidance)}>
-          <p>
+          <Text as="p" size="3" color="gray">
             Enable YouTube Data API v3 in Google Cloud. Restrict your browser
             key to this site’s HTTP referrer and to the YouTube Data API.
-          </p>
-          <p>
+          </Text>
+          <Text as="p" size="3" color="gray">
             Browser storage is not a secret vault: device users and same-origin
             scripts can read the key. API quotas are limited; usage depends on
             the number of search rows and viewing time.
-          </p>
+          </Text>
         </div>
       </section>
     </main>
@@ -126,71 +135,28 @@ export function Setup({
 const styles = stylex.create({
   page: {
     minHeight: "100vh",
-    backgroundColor: "#101014",
-    color: "#f5f5f7",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     padding: "clamp(24px, 5vw, 80px)",
     boxSizing: "border-box",
-    fontFamily: "system-ui, sans-serif",
   },
-  panel: { width: "100%", maxWidth: 900 },
-  eyebrow: {
-    color: "#a7a7b2",
-    fontSize: "clamp(16px, 1.2vw, 22px)",
-    letterSpacing: "0.08em",
-    marginTop: 0,
-    marginBottom: 28,
-  },
-  title: {
-    fontSize: "clamp(36px, 3.8vw, 68px)",
-    lineHeight: 1.3,
-    fontWeight: 650,
-    letterSpacing: "-0.03em",
-    marginTop: 0,
-    marginBottom: 24,
-  },
-  description: {
-    color: "#c3c3cd",
-    fontSize: "clamp(18px, 1.4vw, 26px)",
-    lineHeight: 1.8,
-    marginBottom: 32,
+  panel: {
+    width: "100%",
+    minWidth: 0,
+    maxWidth: 900,
+    display: "flex",
+    flexDirection: "column",
+    gap: 24,
   },
   form: { display: "flex", flexDirection: "column", gap: 14 },
-  label: { fontSize: 20, fontWeight: 600 },
-  input: {
-    backgroundColor: "#202027",
-    color: "#fff",
-    border: "1px solid #555560",
-    borderRadius: 9,
-    fontSize: 25,
-    padding: 18,
-    width: "100%",
-    boxSizing: "border-box",
-    outline: { default: "none", ":focus-visible": "3px solid #fff" },
-    outlineOffset: 3,
-  },
-  button: {
+  action: {
     alignSelf: "flex-start",
-    color: "#101014",
-    backgroundColor: { default: "#f5f5f7", ":disabled": "#73737d" },
-    cursor: { default: "pointer", ":disabled": "default" },
-    fontSize: 22,
-    fontWeight: 600,
-    paddingBlock: 17,
-    paddingInline: 28,
-    border: 0,
-    borderRadius: 9,
-    marginTop: 10,
-    outline: { default: "none", ":focus-visible": "3px solid #fff" },
-    outlineOffset: 5,
+    maxWidth: "100%",
+    whiteSpace: "normal",
+    height: "auto",
+    minHeight: "var(--space-7)",
+    paddingBlock: "var(--space-2)",
   },
-  error: { color: "#ffb8b8", fontSize: 18, margin: 0, lineHeight: 1.6 },
-  guidance: {
-    color: "#a7a7b2",
-    fontSize: "clamp(15px, 1.05vw, 20px)",
-    lineHeight: 1.8,
-    marginTop: 32,
-  },
+  guidance: { display: "flex", flexDirection: "column", gap: 16, marginTop: 8 },
 });

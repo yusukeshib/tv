@@ -1,16 +1,17 @@
+/* Keep library visuals below TV-specific StyleX layout and focus rules. */
+@layer reset, radix;
+@import "@radix-ui/themes/styles.css" layer(radix);
+
 @layer reset {
   * {
     box-sizing: border-box;
   }
   html {
     color-scheme: dark;
-    background: #101112;
+    background: #111113;
   }
   body {
     margin: 0;
-    font-family:
-      -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans JP",
-      sans-serif;
   }
   button,
   input {
@@ -29,12 +30,12 @@
     height: 10px;
   }
   [data-row-scroll]::-webkit-scrollbar-track {
-    background: #1d1b20;
+    background: var(--gray-3);
     border-radius: 5px;
   }
   [data-row-scroll]::-webkit-scrollbar-thumb {
-    background: #cac4d0;
-    border: 2px solid #1d1b20;
+    background: var(--gray-11);
+    border: 2px solid var(--gray-3);
     border-radius: 5px;
   }
   [data-row-scroll]::-webkit-scrollbar-thumb:hover {
@@ -51,7 +52,7 @@
     width: 20px;
     height: 20px;
     margin-top: -7px;
-    border: 2px solid #141218;
+    border: 2px solid var(--gray-3);
     border-radius: 50%;
     background: #fff;
   }
@@ -63,7 +64,7 @@
   [data-player-seek]::-moz-range-thumb {
     width: 20px;
     height: 20px;
-    border: 2px solid #141218;
+    border: 2px solid var(--gray-3);
     border-radius: 50%;
     background: #fff;
   }

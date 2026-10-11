@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { Button, Container, Flex, Heading, Text } from "@radix-ui/themes";
 import {
   Link,
   Route,
@@ -15,6 +16,34 @@ import { createStore } from "./store";
 import { SyncController } from "./sync";
 import { setPlaybackActive, startAppUpdates } from "./appUpdate";
 import type { DisplayRow } from "./types";
+
+function UnavailablePage({
+  title,
+  message,
+}: {
+  title: string;
+  message: string;
+}) {
+  return (
+    <Container size="2" px="5" py="9" asChild>
+      <main>
+        <Flex direction="column" align="start" gap="5">
+          <Heading as="h1" size="7">
+            {title}
+          </Heading>
+          <Text as="p" size="4" color="gray" role="status">
+            {message}
+          </Text>
+          <Button size="3" asChild>
+            <Link to="/" replace>
+              Back to home
+            </Link>
+          </Button>
+        </Flex>
+      </main>
+    </Container>
+  );
+}
 
 function deviceStorage(): Storage {
   try {
@@ -192,26 +221,20 @@ export function App() {
                 }}
               />
             ) : (
-              <main>
-                <p role="status">
-                  This video is not available in your saved library.
-                </p>
-                <Link to="/" replace>
-                  Back to home
-                </Link>
-              </main>
+              <UnavailablePage
+                title="Video unavailable"
+                message="This video is not available in your saved library."
+              />
             )
           }
         />
         <Route
           path="*"
           element={
-            <main>
-              <p>Page not found.</p>
-              <Link to="/" replace>
-                Back to home
-              </Link>
-            </main>
+            <UnavailablePage
+              title="Page not found."
+              message="This page doesn’t exist. Return home to browse your videos."
+            />
           }
         />
       </Routes>

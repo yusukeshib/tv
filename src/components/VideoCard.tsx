@@ -1,4 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
+import { Text } from "@radix-ui/themes";
 import type { Video } from "../types";
 import { theme } from "../theme.stylex";
 import { formatViews } from "../formatViews";
@@ -37,16 +38,22 @@ export function VideoCard({
         />
       </div>
       <div {...stylex.props(styles.content)}>
-        <div {...stylex.props(styles.title)}>{video.title}</div>
-        <div {...stylex.props(styles.meta, styles.channel)}>
+        <Text size="3" weight="medium" {...stylex.props(styles.title)}>
+          {video.title}
+        </Text>
+        <Text size="2" color="gray" {...stylex.props(styles.channel)}>
           {video.channelTitle}
-        </div>
+        </Text>
         <div {...stylex.props(styles.meta, styles.details)}>
-          <span>{formatViews(video.viewCount)}</span>
+          <Text size="2" color="gray">
+            {formatViews(video.viewCount)}
+          </Text>
           {!Number.isNaN(date.getTime()) && (
-            <time dateTime={video.publishedAt}>
-              {date.toLocaleDateString("en-US")}
-            </time>
+            <Text size="2" color="gray" asChild>
+              <time dateTime={video.publishedAt}>
+                {date.toLocaleDateString("en-US")}
+              </time>
+            </Text>
           )}
         </div>
       </div>
@@ -95,12 +102,9 @@ const styles = stylex.create({
     padding: theme.cardInset,
     display: "flex",
     flexDirection: "column",
-    gap: 8,
+    gap: "var(--space-2)",
   },
   title: {
-    fontSize: theme.titleMedium,
-    fontWeight: 500,
-    lineHeight: theme.titleMediumLine,
     display: "-webkit-box",
     WebkitLineClamp: 2,
     WebkitBoxOrient: "vertical",
@@ -110,10 +114,7 @@ const styles = stylex.create({
   meta: {
     display: "flex",
     gap: 8,
-    color: theme.onSurfaceVariant,
-    fontSize: theme.bodyMedium,
     whiteSpace: "nowrap",
-    lineHeight: theme.bodyMediumLine,
   },
   details: { justifyContent: "space-between" },
   channel: {

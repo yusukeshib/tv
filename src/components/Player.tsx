@@ -1,5 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
+import { Button, Text } from "@radix-ui/themes";
+import { theme } from "../theme.stylex";
 import type { Video } from "../types";
 import { loadPlayerAPI, playbackError, type YouTubePlayer } from "../playerApi";
 
@@ -238,24 +240,29 @@ export function Player({
         {...stylex.props(styles.header, !controlsShown && styles.hidden)}
         data-controls-visible={controlsShown}
       >
-        <button
+        <Button
+          size="3"
+          variant="surface"
+          color="gray"
           {...stylex.props(styles.button)}
           onClick={onClose}
           aria-keyshortcuts="Escape"
         >
           ← Back to home
-        </button>
+        </Button>
       </header>
       <div ref={host} {...stylex.props(styles.frameWrap)} />
       {error && (
         <div {...stylex.props(styles.error)} role="alert">
-          <span>{error}</span>
-          <button
+          <Text size="4">{error}</Text>
+          <Button
+            size="3"
+            variant="surface"
             {...stylex.props(styles.button)}
             onClick={() => setAttempt((value) => value + 1)}
           >
             Retry
-          </button>
+          </Button>
         </div>
       )}
       <footer
@@ -264,7 +271,9 @@ export function Player({
         aria-label="Playback controls"
       >
         <div {...stylex.props(styles.timeline)}>
-          <span {...stylex.props(styles.time)}>{timestamp(position)}</span>
+          <Text size="3" color="gray" {...stylex.props(styles.time)}>
+            {timestamp(position)}
+          </Text>
           <input
             {...stylex.props(styles.seek)}
             type="range"
@@ -280,12 +289,14 @@ export function Player({
             disabled={!enabled || !duration}
             onChange={(event) => seek(Number(event.target.value))}
           />
-          <span {...stylex.props(styles.time)}>{timestamp(duration)}</span>
+          <Text size="3" color="gray" {...stylex.props(styles.time)}>
+            {timestamp(duration)}
+          </Text>
         </div>
         {!ready && !error && (
-          <span {...stylex.props(styles.time)} role="status">
+          <Text size="3" color="gray" role="status">
             Loading player…
-          </span>
+          </Text>
         )}
       </footer>
     </div>
@@ -297,10 +308,9 @@ const styles = stylex.create({
     position: "fixed",
     inset: 0,
     zIndex: 100,
-    backgroundColor: "#09090c",
-    color: "#f5f5f7",
+    backgroundColor: "#000",
+    color: theme.onSurface,
     overflow: "hidden",
-    fontFamily: "system-ui, sans-serif",
   },
   header: {
     position: "absolute",
@@ -317,17 +327,7 @@ const styles = stylex.create({
     pointerEvents: "none",
   },
   button: {
-    color: "#fff",
-    backgroundColor: "#272730",
-    border: 0,
-    borderRadius: 8,
-    paddingBlock: 12,
-    paddingInline: 22,
-    fontSize: "clamp(17px, 1.3vw, 24px)",
-    whiteSpace: "nowrap",
     pointerEvents: "auto",
-    cursor: { default: "pointer", ":disabled": "default" },
-    opacity: { default: 1, ":disabled": 0.4 },
     outline: {
       default: "2px solid transparent",
       ":focus-visible": "2px solid #fff",
@@ -362,8 +362,8 @@ const styles = stylex.create({
     gap: 16,
     paddingBlock: 12,
     paddingInline: 16,
-    borderRadius: 12,
-    backgroundColor: "rgba(12,12,16,0.9)",
+    borderRadius: theme.radius,
+    backgroundColor: "var(--color-panel-solid)",
   },
   seek: {
     pointerEvents: "auto",
@@ -380,26 +380,23 @@ const styles = stylex.create({
     cursor: "pointer",
   },
   time: {
-    fontSize: "clamp(14px, 1vw, 18px)",
-    color: "#bfbfc9",
     fontVariantNumeric: "tabular-nums",
     whiteSpace: "nowrap",
   },
-  buttons: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 },
   error: {
     position: "absolute",
     insetInline: "clamp(16px, 2vw, 36px)",
     top: "50%",
     transform: "translateY(-50%)",
     zIndex: 2,
-    padding: 24,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.85)",
+    padding: "var(--space-5)",
+    borderRadius: theme.radius,
+    backgroundColor: "var(--color-panel-solid)",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 16,
-    fontSize: "clamp(16px, 1.2vw, 22px)",
-    color: "#f5f5f7",
+    gap: "var(--space-4)",
+    flexWrap: "wrap",
+    color: theme.onSurface,
   },
 });

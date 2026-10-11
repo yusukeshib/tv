@@ -1,7 +1,8 @@
+import "./global.css";
 import { createRoot } from "react-dom/client";
+import { Theme } from "@radix-ui/themes";
 import { App } from "./App";
 import { HashRouter } from "react-router-dom";
-import "./global.css";
 
 history.scrollRestoration = "manual";
 if (!location.hash)
@@ -11,7 +12,15 @@ if (!location.hash)
     `${location.pathname}${location.search}#/`,
   );
 createRoot(document.getElementById("root")!).render(
-  <HashRouter>
-    <App />
-  </HashRouter>,
+  <Theme
+    appearance="dark"
+    accentColor="gray"
+    grayColor="slate"
+    radius="medium"
+    panelBackground="solid"
+  >
+    <HashRouter>
+      <App />
+    </HashRouter>
+  </Theme>,
 );

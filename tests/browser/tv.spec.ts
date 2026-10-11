@@ -2,6 +2,23 @@ import { test, expect, type Locator, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { playerAPIMock } from "./playerMock";
 
+// Resolve the same public Radix token as the UI, without pinning a library palette.
+async function radixColor(page: Page, token: string): Promise<string> {
+  return page
+    .locator(".radix-themes")
+    .first()
+    .evaluate((root, name) => {
+      if (!getComputedStyle(root).getPropertyValue(name).trim())
+        throw new Error(`Missing Radix token: ${name}`);
+      const probe = document.createElement("span");
+      probe.style.color = `var(${name})`;
+      root.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    }, token);
+}
+
 const config = {
   version: 1,
   rows: [
@@ -96,6 +113,159 @@ async function openHome(page: Page, homeConfig: unknown = config) {
       );
   });
 }
+test("Radix Themes covers every screen and custom TV cards inherit its tokens", async ({
+  page,
+}) => {
+  await openHome(page);
+  const themeRoot = page.locator(".radix-themes").first();
+  await expect(themeRoot).toHaveAttribute("data-accent-color", "gray");
+  await expect(themeRoot).toHaveClass(/dark/);
+  const card = page.getByRole("button", { name: /News story 1,/ }).first();
+  await card.focus();
+  await themeRoot.evaluate((root) =>
+    (root as HTMLElement).style.setProperty("--gray-3", "rgb(31, 42, 53)"),
+  );
+  await expect(card).toHaveCSS("background-color", "rgb(31, 42, 53)");
+  await themeRoot.evaluate((root) =>
+    (root as HTMLElement).style.removeProperty("--gray-3"),
+  );
+  await expect(card).toHaveCSS(
+    "background-color",
+    await radixColor(page, "--gray-3"),
+  );
+  await expect(card.locator(".rt-Text")).not.toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Japan news" })).toHaveClass(
+    /rt-Heading/,
+  );
+  await expect(
+    page.getByRole("button", { name: "Settings", exact: true }),
+  ).toHaveClass(/rt-IconButton/);
+
+  await card.click();
+  await expect(page.getByRole("button", { name: "Back to home" })).toHaveClass(
+    /rt-Button/,
+  );
+  await expect(page.getByRole("slider", { name: "Seek" })).toBeEnabled();
+  await page.keyboard.press("Escape");
+
+  await openSettings(page);
+  await expect(page.getByRole("button", { name: "Save settings" })).toHaveClass(
+    /rt-Button/,
+  );
+  await expect(page.getByLabel("API key", { exact: true })).toHaveClass(
+    /rt-TextFieldInput/,
+  );
+  await expect(page.getByLabel("Candidate order").first()).toHaveCSS(
+    "color",
+    await radixColor(page, "--gray-12"),
+  );
+
+  await page.goto("./#/setup");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveClass(
+    /rt-Heading/,
+  );
+  await expect(page.getByLabel("API key", { exact: true })).toHaveClass(
+    /rt-TextFieldInput/,
+  );
+  await expect(
+    page.getByRole("button", { name: /Save and start/ }),
+  ).toHaveClass(/rt-Button/);
+
+  for (const [route, heading] of [
+    ["#/watch/missing", "Video unavailable"],
+    ["#/missing", "Page not found."],
+  ]) {
+    await page.goto(`./${route}`);
+    await expect(page.getByRole("heading", { name: heading })).toHaveClass(
+      /rt-Heading/,
+    );
+    await expect(page.getByRole("link", { name: "Back to home" })).toHaveClass(
+      /rt-Button/,
+    );
+    await page.getByRole("link", { name: "Back to home" }).click();
+    await expect(page).toHaveURL(/#\/$/);
+  }
+});
+
+test("themed forms fit narrow and wide screens with visible keyboard focus", async ({
+  page,
+}) => {
+  await openHome(page);
+  for (const width of [360, 1280, 1920]) {
+    await page.setViewportSize({ width, height: 1080 });
+    for (const route of ["settings", "setup"]) {
+      await page.goto(`./#/${route}`);
+      const key = page.getByLabel("API key", { exact: true });
+      await expect(key).toBeVisible();
+      await key.focus();
+      await page.keyboard.press("Tab");
+      const focused = page.locator(":focus");
+      await expect(focused).toBeVisible();
+      expect(
+        await focused.evaluate((node) => {
+          const style = getComputedStyle(node);
+          return (
+            (style.outlineStyle !== "none" &&
+              parseFloat(style.outlineWidth) > 0) ||
+            style.boxShadow !== "none"
+          );
+        }),
+      ).toBe(true);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBe(width);
+      await page.screenshot({
+        path: `test-results/${route}-${width}.png`,
+        fullPage: true,
+      });
+    }
+  }
+});
+
+test("themed settings controls stay disabled while JSON loads", async ({
+  page,
+}) => {
+  await openHome(page);
+  await openSettings(page);
+  await page.evaluate(() => {
+    const original = File.prototype.text;
+    File.prototype.text = async function () {
+      await new Promise<void>((resolve) => {
+        (window as any).__releaseSettingsRead = resolve;
+      });
+      File.prototype.text = original;
+      return original.call(this);
+    };
+  });
+  await loadSettingsJSON(page, {
+    version: 1,
+    apiKey: "imported-key",
+    searchDefaults: { order: "relevance", timeRange: "all", maxResults: 25 },
+    rows: [],
+  });
+  await expect(
+    page.getByRole("button", { name: "Save settings" }),
+  ).toBeDisabled();
+  await expect(page.getByLabel("API key", { exact: true })).toBeDisabled();
+  await expect(page.getByLabel("Candidate order").first()).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Add search", exact: true }),
+  ).toBeDisabled();
+  await page.keyboard.press("Control+s");
+  await expect(page).toHaveURL(/#\/settings$/);
+  await page.evaluate(() => (window as any).__releaseSettingsRead());
+  await expect(page.getByRole("status")).toContainText(
+    "Loaded settings into the editor",
+  );
+  await expect(page.getByLabel("API key", { exact: true })).toHaveValue(
+    "imported-key",
+  );
+  await expect(
+    page.getByRole("button", { name: "Save settings" }),
+  ).toBeEnabled();
+  await expect(page.getByLabel("Candidate order").first()).toBeEnabled();
+});
+
 test("watch history survives reload and removal of the source row", async ({
   page,
 }) => {
@@ -204,15 +374,26 @@ test("keyboard selection plays and returns to the same card; only the settings g
   ).toBeVisible();
   await page.getByRole("button", { name: /News story 1,/ }).focus();
   await page.keyboard.press("ArrowRight");
-  const second = page.getByRole("button", { name: /News story 2,/ });
+  const second = page
+    .getByRole("region", { name: "Japan news", exact: true })
+    .getByRole("button", { name: /News story 2,/ });
   await expect(second).toBeFocused();
   await expect(second).toHaveCSS("outline-width", "6px");
-  await expect(second).toHaveCSS("background-color", "rgb(29, 27, 32)");
+  await expect(second).toHaveCSS(
+    "background-color",
+    await radixColor(page, "--gray-3"),
+  );
   const unselected = page.getByRole("button", { name: /News story 1,/ });
   await expect(unselected).toHaveCSS("outline-style", "none");
   await expect(unselected).toHaveCSS("border-top-width", "1px");
-  await expect(unselected).toHaveCSS("border-top-color", "rgb(73, 69, 79)");
-  await expect(unselected).toHaveCSS("background-color", "rgb(20, 18, 24)");
+  await expect(unselected).toHaveCSS(
+    "border-top-color",
+    await radixColor(page, "--gray-6"),
+  );
+  await expect(unselected).toHaveCSS(
+    "background-color",
+    await radixColor(page, "--color-background"),
+  );
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/#\/watch\/video000001$/);
   await expect(page.locator("iframe")).toHaveAttribute(
@@ -327,7 +508,7 @@ test("player: seekbar stays above the iframe and supports pointer seeking", asyn
   await seek.screenshot({ path: "test-results/seekbar.png" });
   await expect(page.getByLabel("Playback controls").locator("div")).toHaveCSS(
     "background-color",
-    "rgba(12, 12, 16, 0.9)",
+    await radixColor(page, "--color-panel-solid"),
   );
   const box = (await seek.boundingBox())!;
   await seek.click({ position: { x: box.width * 0.6, y: box.height / 2 } });
@@ -408,8 +589,9 @@ test("seek batches arrow repeats, preserves the preview, and cancels on close", 
   await page.getByRole("button", { name: /News story 1,/ }).click();
   const seek = page.getByRole("slider", { name: "Seek" });
   await expect(seek).toBeEnabled();
-  await page.clock.install();
-  await page.clock.pauseAt(new Date());
+  const clockStart = Date.now();
+  await page.clock.install({ time: clockStart });
+  await page.clock.pauseAt(clockStart + 1_000);
   for (let i = 0; i < 10; i++) {
     await page.keyboard.press("ArrowRight");
     await page.clock.runFor(50);
@@ -754,7 +936,9 @@ test("cached watch URL survives reload", async ({ page }) => {
   await expect(page).toHaveURL(/#\/watch\/video000000$/);
   await page.getByRole("button", { name: "Back to home" }).click();
   await expect(
-    page.getByRole("button", { name: /News story 1,/ }),
+    page
+      .getByRole("region", { name: "Japan news", exact: true })
+      .getByRole("button", { name: /News story 1,/ }),
   ).toBeFocused();
 });
 
@@ -1406,6 +1590,10 @@ test("keyboard-only: first-time setup can open settings and save without a mouse
   await page.goto("./");
   await keyboardSettings(page);
   await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/#\/$/);
+  await expect(
+    page.getByRole("heading", { name: /Your favorite videos/ }),
+  ).toBeVisible();
   await expect(page.getByLabel("API key", { exact: true })).toBeFocused();
   await page.keyboard.insertText("keyboard-setup-key");
   await tabTo(

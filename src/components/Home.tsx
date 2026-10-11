@@ -8,7 +8,8 @@ import {
 import * as stylex from "@stylexjs/stylex";
 import type { HomeProps } from "../types";
 import { VideoRow } from "./VideoRow";
-import { theme } from "../theme.stylex";
+import { Callout, IconButton, Text } from "@radix-ui/themes";
+import { layout, theme } from "../theme.stylex";
 
 type Selection = { row: string; video: string; index: number };
 type View = {
@@ -305,7 +306,10 @@ export function Home({
       }}
     >
       <div {...stylex.props(styles.toolbar)}>
-        <button
+        <IconButton
+          size="3"
+          variant="soft"
+          color="gray"
           ref={settingsButton}
           type="button"
           aria-label="Settings"
@@ -335,12 +339,14 @@ export function Home({
             />
             <circle cx="12" cy="12" r="3" />
           </svg>
-        </button>
+        </IconButton>
       </div>
       {notice && (
-        <p {...stylex.props(styles.notice)} role="status">
-          {notice}
-        </p>
+        <div {...stylex.props(styles.notice)}>
+          <Callout.Root role="status" color="gray">
+            <Callout.Text>{notice}</Callout.Text>
+          </Callout.Root>
+        </div>
       )}
       <div>
         {rows.map((row) => (
@@ -386,9 +392,9 @@ export function Home({
         ))}
       </div>
       {!rows.length && (
-        <p {...stylex.props(styles.notice)}>
+        <Text as="p" size="3" color="gray" {...stylex.props(styles.notice)}>
           Open Settings to add a search or channel.
-        </p>
+        </Text>
       )}
     </main>
   );
@@ -404,29 +410,16 @@ const styles = stylex.create({
   toolbar: {
     display: "flex",
     justifyContent: "flex-end",
-    paddingInline: theme.gutter,
-    marginBottom: 12,
+    paddingInline: layout.gutter,
+    marginBottom: "var(--space-3)",
   },
   gear: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: 44,
-    height: 44,
-    padding: 0,
-    color: theme.onSurfaceVariant,
-    backgroundColor: "transparent",
-    border: 0,
-    borderRadius: 8,
     outline: { default: "none", ":focus-visible": `3px solid ${theme.focus}` },
     outlineOffset: 3,
   },
   notice: {
-    color: theme.onSurfaceVariant,
-    fontSize: theme.titleMedium,
-    paddingInline: theme.gutter,
+    paddingInline: layout.gutter,
     marginTop: 0,
     marginBottom: theme.sectionGap,
-    lineHeight: theme.titleMediumLine,
   },
 });

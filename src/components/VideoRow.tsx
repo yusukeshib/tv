@@ -2,7 +2,8 @@ import { useRef } from "react";
 import * as stylex from "@stylexjs/stylex";
 import type { DisplayRow, Video } from "../types";
 import { VideoCard } from "./VideoCard";
-import { theme } from "../theme.stylex";
+import { Heading, Text } from "@radix-ui/themes";
+import { layout, theme } from "../theme.stylex";
 interface Props {
   row: DisplayRow;
   activeId?: string;
@@ -25,11 +26,13 @@ export function VideoRow({
   return (
     <section {...stylex.props(styles.section)} aria-label={row.label}>
       <div {...stylex.props(styles.heading)}>
-        <h2 {...stylex.props(styles.title)}>{row.label}</h2>
+        <Heading as="h2" size="6" weight="regular">
+          {row.label}
+        </Heading>
         {loading && (
-          <span {...stylex.props(styles.status)} role="status">
+          <Text size="2" color="gray" role="status">
             Loading…
-          </span>
+          </Text>
         )}
       </div>
       <div
@@ -61,9 +64,9 @@ export function VideoRow({
           />
         ))}
         {!row.videos.length && (
-          <p {...stylex.props(styles.empty)}>
+          <Text as="p" size="3" color="gray" my="5">
             {loading ? "Finding videos…" : "No videos available"}
-          </p>
+          </Text>
         )}
       </div>
     </section>
@@ -75,30 +78,18 @@ const styles = stylex.create({
     display: "flex",
     alignItems: "baseline",
     gap: 16,
-    paddingInline: theme.gutter,
+    paddingInline: layout.gutter,
     marginBottom: 4,
   },
-  title: {
-    fontSize: theme.headlineSmall,
-    lineHeight: theme.headlineSmallLine,
-    fontWeight: 400,
-    margin: 0,
-  },
-  status: { color: theme.onSurfaceVariant, fontSize: theme.bodyMedium },
   track: {
     display: "flex",
-    gap: theme.cardGap,
+    gap: layout.cardGap,
     overflowX: "auto",
-    marginInline: `calc(${theme.gutter} - ${theme.railInset})`,
+    marginInline: `calc(${layout.gutter} - ${theme.railInset})`,
     paddingInline: theme.railInset,
     paddingBlock: theme.railInset,
     scrollPaddingInline: theme.railInset,
     scrollbarWidth: "auto",
     scrollbarColor: `${theme.onSurfaceVariant} ${theme.surfaceContainerLow}`,
-  },
-  empty: {
-    color: theme.onSurfaceVariant,
-    fontSize: theme.titleMedium,
-    marginBlock: theme.sectionGap,
   },
 });

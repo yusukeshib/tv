@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
+import { Button, Callout, Heading, Text, TextField } from "@radix-ui/themes";
 import { parseSettings } from "../store";
-import { theme } from "../theme.stylex";
+import { theme, layout } from "../theme.stylex";
 import {
   DEFAULT_MIN_DURATION_SECONDS,
   type RowDefinition,
@@ -18,112 +19,128 @@ function SearchFields({
 }) {
   return (
     <div {...stylex.props(styles.fields)}>
-      <label {...stylex.props(styles.field)}>
-        Candidate order
-        <select
-          {...stylex.props(styles.input)}
-          value={options.order}
-          onChange={(event) =>
-            onChange({
-              ...options,
-              order: event.target.value as SearchDefaults["order"],
-            })
-          }
-        >
-          <option value="relevance">Relevance</option>
-          <option value="viewCount">View count</option>
-          <option value="rating">Rating</option>
-          <option value="date">Date</option>
-        </select>
-      </label>
-      <label {...stylex.props(styles.field)}>
-        Time range
-        <select
-          {...stylex.props(styles.input)}
-          value={options.timeRange}
-          onChange={(event) =>
-            onChange({
-              ...options,
-              timeRange: event.target.value as SearchDefaults["timeRange"],
-            })
-          }
-        >
-          <option value="all">All time</option>
-          <option value="24h">Past 24 hours</option>
-          <option value="7d">Past 7 days</option>
-          <option value="30d">Past 30 days</option>
-        </select>
-      </label>
-      <label {...stylex.props(styles.field)}>
-        Language preference
-        <input
-          {...stylex.props(styles.input)}
-          value={options.relevanceLanguage ?? ""}
-          placeholder="Any (e.g. en, ja)"
-          onChange={(event) =>
-            onChange({
-              ...options,
-              relevanceLanguage: event.target.value || undefined,
-            })
-          }
-          maxLength={8}
-          spellCheck={false}
-        />
-      </label>
-      <label {...stylex.props(styles.field)}>
-        Region
-        <input
-          {...stylex.props(styles.input)}
-          value={options.regionCode ?? ""}
-          placeholder="Any (e.g. US, JP)"
-          onChange={(event) =>
-            onChange({
-              ...options,
-              regionCode: event.target.value || undefined,
-            })
-          }
-          maxLength={2}
-          spellCheck={false}
-        />
-      </label>
-      <label {...stylex.props(styles.field)}>
-        Results per page
-        <input
-          {...stylex.props(styles.input)}
-          type="number"
-          min={1}
-          max={50}
-          step={1}
-          required
-          value={Number.isFinite(options.maxResults) ? options.maxResults : ""}
-          onChange={(event) =>
-            onChange({ ...options, maxResults: event.target.valueAsNumber })
-          }
-        />
-      </label>
-      <label {...stylex.props(styles.field)}>
-        Minimum duration (seconds)
-        <input
-          {...stylex.props(styles.input)}
-          type="number"
-          min={0}
-          step={1}
-          required
-          value={
-            Number.isFinite(
-              options.minDurationSeconds ?? DEFAULT_MIN_DURATION_SECONDS,
-            )
-              ? (options.minDurationSeconds ?? DEFAULT_MIN_DURATION_SECONDS)
-              : ""
-          }
-          onChange={(event) =>
-            onChange({
-              ...options,
-              minDurationSeconds: event.target.valueAsNumber,
-            })
-          }
-        />
-      </label>
+      <Text asChild size="3" weight="medium">
+        <label {...stylex.props(styles.field)}>
+          Candidate order
+          <select
+            {...stylex.props(styles.select)}
+
+            value={options.order}
+            onChange={(event) =>
+              onChange({
+                ...options,
+                order: event.target.value as SearchDefaults["order"],
+              })
+            }
+          >
+            <option value="relevance">Relevance</option>
+            <option value="viewCount">View count</option>
+            <option value="rating">Rating</option>
+            <option value="date">Date</option>
+          </select>
+        </label>
+      </Text>
+      <Text asChild size="3" weight="medium">
+        <label {...stylex.props(styles.field)}>
+          Time range
+          <select
+            {...stylex.props(styles.select)}
+
+            value={options.timeRange}
+            onChange={(event) =>
+              onChange({
+                ...options,
+                timeRange: event.target.value as SearchDefaults["timeRange"],
+              })
+            }
+          >
+            <option value="all">All time</option>
+            <option value="24h">Past 24 hours</option>
+            <option value="7d">Past 7 days</option>
+            <option value="30d">Past 30 days</option>
+          </select>
+        </label>
+      </Text>
+      <Text asChild size="3" weight="medium">
+        <label {...stylex.props(styles.field)}>
+          Language preference
+          <TextField.Root
+            size="3"
+            value={options.relevanceLanguage ?? ""}
+            placeholder="Any (e.g. en, ja)"
+            onChange={(event) =>
+              onChange({
+                ...options,
+                relevanceLanguage: event.target.value || undefined,
+              })
+            }
+            maxLength={8}
+            spellCheck={false}
+          />
+        </label>
+      </Text>
+      <Text asChild size="3" weight="medium">
+        <label {...stylex.props(styles.field)}>
+          Region
+          <TextField.Root
+            size="3"
+            value={options.regionCode ?? ""}
+            placeholder="Any (e.g. US, JP)"
+            onChange={(event) =>
+              onChange({
+                ...options,
+                regionCode: event.target.value || undefined,
+              })
+            }
+            maxLength={2}
+            spellCheck={false}
+          />
+        </label>
+      </Text>
+      <Text asChild size="3" weight="medium">
+        <label {...stylex.props(styles.field)}>
+          Results per page
+          <TextField.Root
+            size="3"
+            type="number"
+            min={1}
+            max={50}
+            step={1}
+            required
+            value={
+              Number.isFinite(options.maxResults) ? options.maxResults : ""
+            }
+            onChange={(event) =>
+              onChange({ ...options, maxResults: event.target.valueAsNumber })
+            }
+          />
+        </label>
+      </Text>
+      <Text asChild size="3" weight="medium">
+        <label {...stylex.props(styles.field)}>
+          Minimum duration (seconds)
+          <TextField.Root
+            size="3"
+            type="number"
+            min={0}
+            step={1}
+            required
+            value={
+              Number.isFinite(
+                options.minDurationSeconds ?? DEFAULT_MIN_DURATION_SECONDS,
+              )
+                ? (options.minDurationSeconds ?? DEFAULT_MIN_DURATION_SECONDS)
+                : ""
+            }
+            onChange={(event) =>
+              onChange({
+                ...options,
+                minDurationSeconds: event.target.valueAsNumber,
+              })
+            }
+          />
+        </label>
+      </Text>
     </div>
   );
 }
@@ -293,60 +310,65 @@ export function Settings({
         }}
       >
         <header {...stylex.props(styles.header)}>
-          <h1 {...stylex.props(styles.title)}>Settings</h1>
-          <button
+          <Heading as="h1" size="7" {...stylex.props(styles.title)}>
+            Settings
+          </Heading>
+          <Button
+            size="3"
+            variant="soft"
             type="button"
             onClick={onCancel}
             aria-keyshortcuts="Escape"
-            {...stylex.props(styles.button)}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            size="3"
+            variant="solid"
             type="submit"
             aria-keyshortcuts="Control+s Meta+s"
             disabled={loading}
-            {...stylex.props(styles.button, styles.primary)}
           >
             Save settings
-          </button>
+          </Button>
         </header>
         {error && (
-          <p role="alert" {...stylex.props(styles.error)}>
-            {error}
-          </p>
+          <Callout.Root role="alert" color="red">
+            <Callout.Text>{error}</Callout.Text>
+          </Callout.Root>
         )}
         {notice && (
-          <p role="status" {...stylex.props(styles.description)}>
-            {notice}
-          </p>
+          <Callout.Root role="status">
+            <Callout.Text>{notice}</Callout.Text>
+          </Callout.Root>
         )}
         <fieldset disabled={loading} {...stylex.props(styles.section)}>
-          <legend>JSON Load / Dump</legend>
-          <p {...stylex.props(styles.description)}>
+          <Text asChild size="3" weight="bold">
+            <legend>JSON Load / Dump</legend>
+          </Text>
+          <Text as="p" size="3" color="gray">
             One file contains your Home list, search defaults and API key. Load
             replaces the editor’s contents; Save applies them. Dump exports the
             editor’s current settings.
-          </p>
-          <p {...stylex.props(styles.warning)}>
-            This JSON contains your secret API key. Do not commit it to GitHub
-            or share it publicly.
-          </p>
+          </Text>
+          <Callout.Root color="amber">
+            <Callout.Text>
+              This JSON contains your secret API key. Do not commit it to GitHub
+              or share it publicly.
+            </Callout.Text>
+          </Callout.Root>
           <div {...stylex.props(styles.actions)}>
-            <button
+            <Button
+              size="3"
+              variant="soft"
               type="button"
               onClick={() => fileInput.current?.click()}
-              {...stylex.props(styles.button)}
             >
               Load JSON
-            </button>
-            <button
-              type="button"
-              onClick={dump}
-              {...stylex.props(styles.button)}
-            >
+            </Button>
+            <Button size="3" variant="soft" type="button" onClick={dump}>
               Dump JSON
-            </button>
+            </Button>
             <input
               ref={fileInput}
               type="file"
@@ -362,34 +384,40 @@ export function Settings({
           </div>
         </fieldset>
         <fieldset disabled={loading} {...stylex.props(styles.section)}>
-          <legend>YouTube</legend>
-          <label {...stylex.props(styles.field)}>
-            API key
-            <input
-              autoFocus
-              {...stylex.props(styles.input)}
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              maxLength={500}
-              required
-              value={draft.apiKey}
-              onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  apiKey: event.target.value,
-                }))
-              }
-            />
-          </label>
+          <Text asChild size="3" weight="bold">
+            <legend>YouTube</legend>
+          </Text>
+          <Text asChild size="3" weight="medium">
+            <label {...stylex.props(styles.field)}>
+              API key
+              <TextField.Root
+                size="3"
+                autoFocus
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                maxLength={500}
+                required
+                value={draft.apiKey}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    apiKey: event.target.value,
+                  }))
+                }
+              />
+            </label>
+          </Text>
         </fieldset>
         <fieldset disabled={loading} {...stylex.props(styles.section)}>
-          <legend>Search defaults</legend>
-          <p {...stylex.props(styles.description)}>
+          <Text asChild size="3" weight="bold">
+            <legend>Search defaults</legend>
+          </Text>
+          <Text as="p" size="3" color="gray">
             Initial conditions for new searches. Existing searches keep their
             own conditions. Candidate order selects videos; results are
             displayed newest first.
-          </p>
+          </Text>
           <SearchFields
             options={draft.searchDefaults}
             onChange={(searchDefaults) =>
@@ -398,16 +426,18 @@ export function Settings({
           />
         </fieldset>
         <fieldset disabled={loading} {...stylex.props(styles.section)}>
-          <legend>Home list</legend>
-          <p {...stylex.props(styles.description)}>
+          <Text asChild size="3" weight="bold">
+            <legend>Home list</legend>
+          </Text>
+          <Text as="p" size="3" color="gray">
             GitHub supplies the defaults. Once you save here, your local list is
             authoritative, including deletions. Changes fetch videos only after
             saving.
-          </p>
+          </Text>
           {!draft.rows.length && (
-            <p {...stylex.props(styles.description)}>
+            <Text as="p" size="3" color="gray">
               Your Home list is empty.
-            </p>
+            </Text>
           )}
           {draft.rows.map((row, index) => (
             <fieldset
@@ -418,46 +448,53 @@ export function Settings({
               }}
               {...stylex.props(styles.row)}
             >
-              <legend>
-                {index + 1}. {row.label || "Untitled"}
-              </legend>
+              <Text asChild size="3" weight="bold">
+                <legend>
+                  {index + 1}. {row.label || "Untitled"}
+                </legend>
+              </Text>
               <div {...stylex.props(styles.rowHeader)}>
-                <label {...stylex.props(styles.field, styles.grow)}>
-                  Label
-                  <input
-                    {...stylex.props(styles.input)}
-                    required
-                    maxLength={500}
-                    value={row.label}
-                    onChange={(event) =>
-                      updateRow({ ...row, label: event.target.value })
-                    }
-                  />
-                </label>
-                <button
+                <Text asChild size="3" weight="medium">
+                  <label {...stylex.props(styles.field, styles.grow)}>
+                    Label
+                    <TextField.Root
+                      size="3"
+                      required
+                      maxLength={500}
+                      value={row.label}
+                      onChange={(event) =>
+                        updateRow({ ...row, label: event.target.value })
+                      }
+                    />
+                  </label>
+                </Text>
+                <Button
+                  size="3"
+                  variant="soft"
                   type="button"
                   aria-label={`Move ${row.label || "row"} up`}
                   disabled={index === 0}
                   data-move="-1"
                   onClick={() => moveRow(row.id, -1)}
-                  {...stylex.props(styles.button)}
                 >
                   ↑ Up
-                </button>
-                <button
+                </Button>
+                <Button
+                  size="3"
+                  variant="soft"
                   type="button"
                   aria-label={`Move ${row.label || "row"} down`}
                   disabled={index === draft.rows.length - 1}
                   data-move="1"
                   onClick={() => moveRow(row.id, 1)}
-                  {...stylex.props(styles.button)}
                 >
                   ↓ Down
-                </button>
-                <button
+                </Button>
+                <Button
+                  size="3"
+                  variant="soft"
                   type="button"
                   aria-label={`Delete ${row.label || "row"}`}
-                  {...stylex.props(styles.button)}
                   onClick={() => {
                     pendingFocus.current = {
                       id:
@@ -472,25 +509,30 @@ export function Settings({
                   }}
                 >
                   Delete
-                </button>
+                </Button>
               </div>
               {row.type === "search" ? (
                 <>
-                  <label {...stylex.props(styles.field)}>
-                    Search query
-                    <input
-                      {...stylex.props(styles.input)}
-                      required
-                      maxLength={500}
-                      value={row.search.query}
-                      onChange={(event) =>
-                        updateRow({
-                          ...row,
-                          search: { ...row.search, query: event.target.value },
-                        })
-                      }
-                    />
-                  </label>
+                  <Text asChild size="3" weight="medium">
+                    <label {...stylex.props(styles.field)}>
+                      Search query
+                      <TextField.Root
+                        size="3"
+                        required
+                        maxLength={500}
+                        value={row.search.query}
+                        onChange={(event) =>
+                          updateRow({
+                            ...row,
+                            search: {
+                              ...row.search,
+                              query: event.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </label>
+                  </Text>
                   <SearchFields
                     options={row.search}
                     onChange={(options) =>
@@ -502,40 +544,44 @@ export function Settings({
                   />
                 </>
               ) : (
-                <label {...stylex.props(styles.field)}>
-                  Channel ID
-                  <input
-                    {...stylex.props(styles.input)}
-                    required
-                    value={row.channelId}
-                    placeholder="@handle or UC… channel ID"
-                    spellCheck={false}
-                    onChange={(event) =>
-                      updateRow({ ...row, channelId: event.target.value })
-                    }
-                  />
-                </label>
+                <Text asChild size="3" weight="medium">
+                  <label {...stylex.props(styles.field)}>
+                    Channel ID
+                    <TextField.Root
+                      size="3"
+                      required
+                      value={row.channelId}
+                      placeholder="@handle or UC… channel ID"
+                      spellCheck={false}
+                      onChange={(event) =>
+                        updateRow({ ...row, channelId: event.target.value })
+                      }
+                    />
+                  </label>
+                </Text>
               )}
             </fieldset>
           ))}
           <div {...stylex.props(styles.actions)}>
-            <button
+            <Button
+              size="3"
+              variant="soft"
               type="button"
               disabled={draft.rows.length >= 50}
               ref={addSearch}
               onClick={() => addRow("search")}
-              {...stylex.props(styles.button)}
             >
               Add search
-            </button>
-            <button
+            </Button>
+            <Button
+              size="3"
+              variant="soft"
               type="button"
               disabled={draft.rows.length >= 50}
               onClick={() => addRow("channel")}
-              {...stylex.props(styles.button)}
             >
               Add channel
-            </button>
+            </Button>
           </div>
         </fieldset>
       </form>
@@ -548,7 +594,7 @@ const styles = stylex.create({
     minHeight: "100vh",
     backgroundColor: theme.surface,
     color: theme.onSurface,
-    padding: theme.gutter,
+    padding: layout.gutter,
   },
   form: {
     maxWidth: 1100,
@@ -558,12 +604,12 @@ const styles = stylex.create({
     gap: 24,
   },
   header: { display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" },
-  title: { fontSize: 32, margin: 0, flexGrow: 1 },
+  title: { flexGrow: 1 },
   section: {
     margin: 0,
-    border: `1px solid ${theme.outlineVariant}`,
-    borderRadius: theme.radius,
-    padding: 24,
+    border: "1px solid var(--gray-6)",
+    borderRadius: "var(--radius-3)",
+    padding: { default: 24, "@media (max-width: 600px)": 12 },
     minWidth: 0,
     display: "flex",
     flexDirection: "column",
@@ -572,16 +618,16 @@ const styles = stylex.create({
   row: {
     margin: 0,
     minWidth: 0,
-    padding: 20,
-    border: `1px solid ${theme.outlineVariant}`,
-    borderRadius: theme.radius,
-    backgroundColor: theme.surfaceContainerLow,
+    padding: { default: 20, "@media (max-width: 600px)": 12 },
+    border: "1px solid var(--gray-6)",
+    borderRadius: "var(--radius-3)",
+    backgroundColor: "var(--gray-2)",
     display: "flex",
     flexDirection: "column",
     gap: 16,
   },
-  rowHeader: { display: "flex", alignItems: "end", gap: 16, flexWrap: "wrap" },
-  grow: { flexGrow: 1, minWidth: 0 },
+  rowHeader: { display: "flex", alignItems: "end", gap: 12, flexWrap: "wrap" },
+  grow: { flexGrow: 1, flexBasis: "100%", minWidth: 0 },
   fields: {
     display: "grid",
     gridTemplateColumns: {
@@ -591,39 +637,25 @@ const styles = stylex.create({
     },
     gap: 16,
   },
-  field: { display: "flex", flexDirection: "column", gap: 8, fontSize: 16 },
-  input: {
+  field: { display: "flex", flexDirection: "column", gap: 8, minWidth: 0 },
+  select: {
     width: "100%",
     minWidth: 0,
-    fontSize: 18,
-    padding: 12,
-    color: theme.onSurface,
-    backgroundColor: theme.surface,
-    border: `1px solid ${theme.outlineVariant}`,
-    borderRadius: 8,
-    outline: { default: "none", ":focus-visible": `3px solid ${theme.focus}` },
-    outlineOffset: 3,
+    boxSizing: "border-box",
+    height: "var(--space-7)",
+    fontSize: "var(--font-size-3)",
+    fontFamily: "inherit",
+    fontWeight: "var(--font-weight-regular)",
+    paddingInline: "var(--space-3)",
+    color: { default: "var(--gray-12)", ":disabled": "var(--gray-8)" },
+    backgroundColor: {
+      default: "var(--color-surface)",
+      ":disabled": "var(--gray-2)",
+    },
+    border: "1px solid var(--gray-7)",
+    borderRadius: "var(--radius-2)",
+    outline: { default: "none", ":focus-visible": "2px solid var(--focus-8)" },
+    outlineOffset: 2,
   },
   actions: { display: "flex", gap: 12, flexWrap: "wrap" },
-  button: {
-    paddingBlock: 12,
-    paddingInline: 20,
-    fontSize: 16,
-    color: theme.onSurface,
-    backgroundColor: theme.surfaceContainerLow,
-    border: `1px solid ${theme.outlineVariant}`,
-    borderRadius: 8,
-    outline: { default: "none", ":focus-visible": `3px solid ${theme.focus}` },
-    outlineOffset: 3,
-    opacity: { default: 1, ":disabled": 0.5 },
-  },
-  primary: { color: theme.surface, backgroundColor: theme.onSurface },
-  description: {
-    color: theme.onSurfaceVariant,
-    lineHeight: 1.6,
-    fontSize: 16,
-    margin: 0,
-  },
-  warning: { color: "#ffdfa0", lineHeight: 1.6, fontSize: 16, margin: 0 },
-  error: { color: "#ffb8b8", lineHeight: 1.6, fontSize: 18, margin: 0 },
 });

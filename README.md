@@ -1,6 +1,6 @@
 # TV
 
-A small, offline-first YouTube interface for a Mac connected to a TV. React, TypeScript, Vite, and StyleX. Hosted on GitHub Pages; no backend.
+A small, offline-first YouTube interface for a Mac connected to a TV. React, TypeScript, Vite, Radix Themes, and StyleX. Hosted on GitHub Pages; no backend.
 
 **Open:** https://yusukeshib.github.io/tv/
 
@@ -172,7 +172,11 @@ bun run format:check
 
 Use `bun run test`, not Bun’s native `bun test`: these tests use Vitest mocks/timers. Service workers are enabled in production builds, not the dev server. `bun run preview` serves the built app locally. `tests/server.mjs` is only a local test harness, not a deployed backend; its version switches exercise successful and failed HTML-only updates.
 
-UI styles use StyleX compiled at build time. The list uses Material 3 dark surface/type roles and the Android TV focus guidance, implemented with a small shared value file (`src/theme.stylex.ts`), not a component framework or theme engine. Cards keep a preferred width of 284px and 16:9 thumbnails rather than a fixed column count; narrow viewports cap each card at the available row width. Rows scroll horizontally, with the visible card count adapting to the viewport. Desktop gutters are 48px, card gaps 24px, and card text insets 16px. Only the selected card has a white focus ring; no hover decoration or animation is added. References: [Material typography](https://github.com/material-components/material-web/blob/main/docs/theming/typography.md), [TV focus](https://developer.android.com/design/ui/tv/guides/styles/focus-system).
+All screens use [Radix Themes](https://www.radix-ui.com/themes/docs/overview/getting-started): Home, Settings, Setup, playback controls, and unavailable-page states. The root `Theme` in `src/main.tsx` selects a dark slate palette, gray accent, medium radius, and solid panels. Use Radix buttons, text fields, typography, and callouts directly; change the root theme to adjust their appearance together. No Tailwind or additional component framework is needed.
+
+StyleX remains compiled at build time for TV-specific layout and custom controls. `src/theme.stylex.ts` maps custom component styles to Radix color, spacing, radius, and typography tokens; `defineConsts` keeps those references inside the Theme scope, while `layout` holds responsive gutters and gaps. `src/global.css` orders the reset, Radix, and generated StyleX CSS layers. Native selects, file inputs, and the player range input intentionally retain their browser keyboard/form behavior; visible native controls use the shared tokens. The player’s black video canvas and bright white seek/focus indicators remain TV-specific.
+
+Cards keep a preferred width of 284px and 16:9 thumbnails rather than a fixed column count; narrow viewports cap each card at the available row width. Rows scroll horizontally, with the visible card count adapting to the viewport. Desktop gutters are 48px, card gaps 24px, and card text insets 16px. Only the selected card has a 6px white focus ring; no card hover decoration or animation is added. Reference: [TV focus guidance](https://developer.android.com/design/ui/tv/guides/styles/focus-system).
 
 ## Deployment
 
