@@ -166,7 +166,7 @@ bun run dev
 bun run test             # mocked data tests (Vitest)
 bun run build           # TypeScript + production bundle + service worker
 bunx playwright install chromium
-bun run test:browser     # bounded production-build Chromium smoke tests
+bun run test:browser     # production Chromium suite + Vite development layout checks
 bun run format:check
 ```
 
@@ -174,7 +174,7 @@ Use `bun run test`, not Bun’s native `bun test`: these tests use Vitest mocks/
 
 All screens use [Radix Themes](https://www.radix-ui.com/themes/docs/overview/getting-started): Home, Settings, Setup, playback controls, and unavailable-page states. The root `Theme` in `src/main.tsx` selects a dark slate palette, gray accent, medium radius, and solid panels. Use Radix buttons, text fields, typography, and callouts directly; change the root theme to adjust their appearance together. No Tailwind or additional component framework is needed.
 
-StyleX remains compiled at build time for TV-specific layout and custom controls. `src/theme.stylex.ts` maps custom component styles to Radix color, spacing, radius, and typography tokens; `defineConsts` keeps those references inside the Theme scope, while `layout` holds responsive gutters and gaps. `src/global.css` orders the reset, Radix, and generated StyleX CSS layers. Native selects, file inputs, and the player range input intentionally retain their browser keyboard/form behavior; visible native controls use the shared tokens. The player’s black video canvas and bright white seek/focus indicators remain TV-specific.
+StyleX remains compiled at build time for TV-specific layout and custom controls. `src/theme.stylex.ts` maps custom component styles to Radix color, spacing, radius, and typography tokens; `defineConsts` keeps those references inside the Theme scope, while `layout` holds responsive gutters and gaps. `index.html` establishes the reset → Radix → generated StyleX CSS layer order before any stylesheet loads; `src/global.css` imports Radix into its layer. Keep the ordering declaration in HTML: Vite injects StyleX and app CSS independently during development, and declaring the order only in app CSS can let Radix’s reset override TV layout rules. Native selects, file inputs, and the player range input intentionally retain their browser keyboard/form behavior; visible native controls use the shared tokens. The player’s black video canvas and bright white seek/focus indicators remain TV-specific.
 
 Video cards use Radix `Card` (`size="2"`, `variant="surface"`) with `asChild` on the native button, so Radix owns the surface, border, radius, and padding without adding a wrapper or changing keyboard navigation. Radix `Inset` places the thumbnail flush with the card edges, and `Flex`/`Text` arrange the metadata. StyleX only adds TV-specific sizing, thumbnail geometry, text truncation, and the selection ring.
 
@@ -187,6 +187,8 @@ The `Deploy TV` GitHub Actions workflow builds with Bun and publishes `dist` to 
 Rollback by reverting the relevant commit and pushing normally. The reverted build is delivered as a new service-worker update. Dump your local settings privately before rolling back to an older config-authoritative build; old builds may overwrite the list and may require re-entering the key. Revert public default-config changes similarly. Clearing site data is a last-resort recovery step: it deletes the saved key, lists, and offline copy.
 
 ## Validation limits
+
+Browser tests cover both the production build and Vite development mode. The shared card-layout regression uses sparse and dense rows, short/long Japanese and English titles, long channel names, mixed thumbnail aspect ratios, and a failed image; it checks every card’s dimensions and keyboard selection at desktop/mobile widths, before and after reload.
 
 Automated tests use mocked YouTube responses and an embedded-player placeholder; they do not prove actual YouTube playback, API-key permissions, every video’s compatibility, sustained quota availability, or comfort on a physical TV. Those need a restricted real key and a Mac/HDMI smoke check.
 

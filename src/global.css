@@ -1,5 +1,5 @@
-/* Keep library visuals below TV-specific StyleX layout and focus rules. */
-@layer reset, radix;
+/* index.html establishes reset → radix → generated StyleX layer order before
+   Vite's independently injected stylesheets can race during development. */
 @import "@radix-ui/themes/styles.css" layer(radix);
 
 @layer reset {
